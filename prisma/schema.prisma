@@ -1,0 +1,214 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  STUDENT
+  ORGANIZER
+  ADMIN
+}
+
+enum EventStatus {
+  DRAFT
+  PUBLISHED
+  CLOSED
+  COMPLETED
+  CANCELLED
+}
+
+enum ParticipationType {
+  INDIVIDUAL
+  TEAM
+}
+
+enum RegistrationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  WITHDRAWN
+}
+
+enum EventCategory {
+  TECHNICAL
+  SPORTS
+  CULTURAL
+  ACADEMIC
+  GAMING
+  OTHER
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String
+  email         String    @unique
+  emailVerified Boolean   @default(false)
+  image         String?
+  role          Role      @default(STUDENT)
+  rollNumber    String?
+  department    String?
+  phone         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  createdEvents        Event[]        @relation("EventCreator")
+  registrations        Registration[]
+  ledTeams             Team[]         @relation("TeamLeader")
+  reviewedRegistrations Registration[] @relation("RegistrationReviewer")
+  feedback             Feedback[]
+  announcements        Announcement[] @relation("AnnouncementCreator")
+
+  @@map("users")
+}
+
+model Event {
+  id                   String            @id @default(cuid())
+  slug                 String            @unique
+  title                String
+  summary              String
+  description          String            @db.Text
+  rules                String            @db.Text
+  eligibility          String            @db.Text
+  prizes               String            @db.Text
+  venue                String
+  category             EventCategory
+  status               EventStatus       @default(DRAFT)
+  participationType    ParticipationType
+  minTeamSize          Int               @default(1)
+  maxTeamSize          Int               @default(1)
+  maxParticipants      Int?
+  startsAt             DateTime
+  endsAt               DateTime?
+  registrationDeadline DateTime
+  posterUrl            String?
+  resultsPublished     Boolean           @default(false)
+  createdById          String
+  createdAt            DateTime          @default(now())
+  updatedAt            DateTime          @updatedAt
+
+  createdBy     User           @relation("EventCreator", fields: [createdById], references: [id])
+  registrations Registration[]
+  teams         Team[]
+  results       Result[]
+  feedback      Feedback[]
+
+  @@index([status, startsAt])
+  @@index([category])
+  @@map("events")
+}
+
+model Registration {
+  id              String             @id @default(cuid())
+  eventId         String
+  userId          String
+  teamId          String?
+  status          RegistrationStatus @default(PENDING)
+  notes           String?
+  rejectionReason String?
+  reviewedById    String?
+  reviewedAt      DateTime?
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+
+  event      Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  team       Team?    @relation(fields: [teamId], references: [id], onDelete: SetNull)
+  reviewedBy User?    @relation("RegistrationReviewer", fields: [reviewedById], references: [id])
+  result     Result?
+
+  @@unique([eventId, userId])
+  @@index([eventId, status])
+  @@index([userId])
+  @@map("registrations")
+}
+
+model Team {
+  id        String   @id @default(cuid())
+  eventId   String
+  name      String
+  leaderId  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  event         Event          @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  leader        User           @relation("TeamLeader", fields: [leaderId], references: [id])
+  members       TeamMember[]
+  registrations Registration[]
+
+  @@unique([eventId, name])
+  @@index([eventId])
+  @@map("teams")
+}
+
+model TeamMember {
+  id         String   @id @default(cuid())
+  teamId     String
+  fullName   String
+  rollNumber String
+  email      String?
+  phone      String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  team Team @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  @@index([teamId])
+  @@map("team_members")
+}
+
+model Result {
+  id             String   @id @default(cuid())
+  eventId        String
+  registrationId String   @unique
+  position       Int
+  award          String?
+  certificateUrl String?
+  remarks        String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  event        Event        @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  registration Registration @relation(fields: [registrationId], references: [id], onDelete: Cascade)
+
+  @@unique([eventId, registrationId])
+  @@index([eventId, position])
+  @@map("results")
+}
+
+model Feedback {
+  id        String   @id @default(cuid())
+  eventId   String
+  userId    String
+  rating    Int
+  comment   String?  @db.Text
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([eventId, userId])
+  @@index([eventId])
+  @@index([userId])
+  @@map("feedbacks")
+}
+
+model Announcement {
+  id          String   @id @default(cuid())
+  title       String
+  body        String   @db.Text
+  pinned      Boolean  @default(false)
+  publishedAt DateTime @default(now())
+  createdById String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  createdBy User @relation("AnnouncementCreator", fields: [createdById], references: [id])
+
+  @@index([pinned, publishedAt])
+  @@map("announcements")
+}
