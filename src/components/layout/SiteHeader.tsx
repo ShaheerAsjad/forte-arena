@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { Logo } from "@/components/shared/Logo";
 import { Menu, X, ArrowRight, Calendar, Trophy, Info } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { motion } from "motion/react";
 
 const NAV_LINKS = [
   { href: "/", label: "Home" },
@@ -26,7 +27,7 @@ export function SiteHeader() {
         <Logo size="md" />
 
         {/* Desktop Nav Links */}
-        <nav className="hidden md:flex items-center gap-1 bg-navy-50/70 p-1 rounded-full border border-navy-100/40">
+        <nav className="hidden md:flex items-center gap-1 bg-navy-50/70 p-1 rounded-full border border-navy-100/40 relative">
           {NAV_LINKS.map((link) => {
             const isActive =
               link.href === "/"
@@ -38,13 +39,25 @@ export function SiteHeader() {
                 key={link.href}
                 href={link.href}
                 className={cn(
-                  "px-4 py-1.5 rounded-full text-sm font-medium transition-all duration-200 select-none",
+                  "relative group px-4 py-1.5 rounded-full text-sm font-medium transition-colors select-none",
                   isActive
-                    ? "bg-navy-900 text-ivory font-semibold shadow-xs"
-                    : "text-ink/80 hover:text-navy-900 hover:bg-white/80"
+                    ? "text-ivory font-semibold"
+                    : "text-ink/80 hover:text-navy-900"
                 )}
               >
-                {link.label}
+                {isActive && (
+                  <motion.div
+                    layoutId="activeNavPill"
+                    className="absolute inset-0 bg-navy-900 rounded-full shadow-xs -z-10"
+                    transition={{ type: "spring", stiffness: 380, damping: 30 }}
+                  />
+                )}
+                <span className="relative z-10 inline-block">
+                  {link.label}
+                  {!isActive && (
+                    <span className="absolute -bottom-0.5 left-2 right-2 h-[2px] bg-gold-500 scale-x-0 group-hover:scale-x-100 transition-transform duration-200 origin-center rounded-full" />
+                  )}
+                </span>
               </Link>
             );
           })}

@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { Stagger, StaggerItem } from "@/components/motion/Stagger";
 import { ResultsService } from "@/features/results/services/results.service";
 import { formatEventDate } from "@/lib/dates";
 import { Trophy, Medal, ArrowRight, Calendar, MapPin } from "lucide-react";
@@ -46,21 +47,21 @@ async function ResultsListLoader() {
   }
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-7">
+    <Stagger className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-7">
       {events.map((ev) => {
         const first = ev.results.find((r) => r.position === 1);
         const second = ev.results.find((r) => r.position === 2);
 
         return (
-          <Link
-            key={ev.id}
-            href={`/results/${ev.slug}`}
-            className="group block focus:outline-none"
-          >
-            <Card
-              hoverable
-              className="h-full flex flex-col justify-between p-6 bg-white border border-navy-100 space-y-6"
+          <StaggerItem key={ev.id}>
+            <Link
+              href={`/results/${ev.slug}`}
+              className="group block focus:outline-none h-full"
             >
+              <Card
+                hoverable
+                className="h-full flex flex-col justify-between p-6 bg-white border border-navy-100 space-y-6 hover:-translate-y-1 hover:border-gold-400/80 hover:shadow-lg transition-all duration-300"
+              >
               <div className="space-y-3">
                 <div className="flex items-center justify-between text-xs">
                   <Badge variant="gold" size="sm">
@@ -119,9 +120,10 @@ async function ResultsListLoader() {
               </div>
             </Card>
           </Link>
-        );
-      })}
-    </div>
+        </StaggerItem>
+      );
+    })}
+  </Stagger>
   );
 }
 

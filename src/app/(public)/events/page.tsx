@@ -7,6 +7,7 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Skeleton } from "@/components/ui/Skeleton";
+import { Stagger, StaggerItem } from "@/components/motion/Stagger";
 import { EventsService } from "@/features/events/services/events.service";
 import { ChevronLeft, ChevronRight, Inbox } from "lucide-react";
 import type { EventCategory, EventStatus } from "@/lib/db-types";
@@ -114,11 +115,13 @@ async function EventsGridLoader({
       </div>
 
       {/* Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-7">
+      <Stagger className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-7">
         {events.map((event) => (
-          <EventCard key={event.item.id} event={event} />
+          <StaggerItem key={event.item.id}>
+            <EventCard event={event} />
+          </StaggerItem>
         ))}
-      </div>
+      </Stagger>
 
       {/* Pagination Controls */}
       {totalPages > 1 && (

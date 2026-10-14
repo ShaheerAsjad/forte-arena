@@ -16,6 +16,7 @@ import {
   HelpCircle,
   Clock,
 } from "lucide-react";
+import { CategoryArtwork } from "@/components/shared/CategoryArtwork";
 import type { EventWithDerivedStatus } from "@/features/events/services/events.service";
 import type { EventCardItem } from "@/features/events/repositories/events.repository";
 import type { EventCategory } from "@/lib/db-types";
@@ -77,9 +78,9 @@ export function EventCard({ event, className }: EventCardProps) {
     <Link href={`/events/${item.slug}`} className="group block focus:outline-none">
       <Card
         hoverable
-        className={`h-full flex flex-col overflow-hidden border border-navy-100/80 bg-white transition-all duration-300 ${className ?? ""}`}
+        className={`h-full flex flex-col overflow-hidden border border-navy-100/80 bg-white transition-all duration-300 hover:-translate-y-1.5 group-hover:border-gold-400/80 group-hover:shadow-[0_16px_36px_-8px_rgba(245,185,1,0.22),0_8px_16px_-6px_rgba(0,15,64,0.06)] ${className ?? ""}`}
       >
-        {/* Poster Media / Gradient Hero */}
+        {/* Poster Media / Illustrated Geometric Fallback */}
         <div className="relative w-full aspect-16/10 bg-gradient-to-br from-navy-950 via-navy-900 to-navy-800 overflow-hidden">
           {item.posterUrl ? (
             <Image
@@ -87,21 +88,17 @@ export function EventCard({ event, className }: EventCardProps) {
               alt={item.title}
               fill
               sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
-              className="object-cover group-hover:scale-105 transition-transform duration-500"
+              className="object-cover group-hover:scale-105 transition-transform duration-500 ease-out"
             />
           ) : (
-            <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center">
-              <div className="w-14 h-14 rounded-2xl bg-white/10 backdrop-blur-md flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
-                <CategoryIcon className="w-8 h-8 text-gold-400" />
-              </div>
-              <span className="text-xs font-semibold uppercase tracking-widest text-gold-400/80 font-heading">
-                {categoryMeta.label}
-              </span>
-            </div>
+            <CategoryArtwork
+              category={item.category}
+              className="transition-transform duration-500 ease-out group-hover:scale-105"
+            />
           )}
 
           {/* Date Stamp Badge (Top Left) */}
-          <div className="absolute top-3 left-3 flex flex-col items-center justify-center w-12 h-14 rounded-xl bg-white/95 backdrop-blur-md shadow-md text-navy-950 border border-white/40">
+          <div className="absolute top-3 left-3 flex flex-col items-center justify-center w-12 h-14 rounded-xl bg-white/95 backdrop-blur-md shadow-md text-navy-950 border border-white/40 group-hover:border-gold-300/80 transition-colors">
             <span className="text-[10px] font-bold tracking-wider uppercase text-gold-600">
               {dateParts.month}
             </span>
@@ -117,8 +114,8 @@ export function EventCard({ event, className }: EventCardProps) {
 
           {/* Category Chip (Bottom Left) */}
           <div className="absolute bottom-3 left-3">
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-navy-950/80 text-ivory backdrop-blur-md border border-white/20">
-              <CategoryIcon className="w-3.5 h-3.5 text-gold-400" />
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-navy-950/80 text-ivory backdrop-blur-md border border-white/20 group-hover:border-gold-400/50 transition-colors">
+              <CategoryIcon className="w-3.5 h-3.5 text-gold-400 group-hover:rotate-6 group-hover:scale-110 transition-transform duration-300" />
               <span>{categoryMeta.label}</span>
             </span>
           </div>
