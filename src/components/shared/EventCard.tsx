@@ -93,12 +93,13 @@ export function EventCard({ event, className }: EventCardProps) {
           ) : (
             <CategoryArtwork
               category={item.category}
+              showIcon={false}
               className="transition-transform duration-500 ease-out group-hover:scale-105"
             />
           )}
 
           {/* Date Stamp Badge (Top Left) */}
-          <div className="absolute top-3 left-3 flex flex-col items-center justify-center w-12 h-14 rounded-xl bg-white/95 backdrop-blur-md shadow-md text-navy-950 border border-white/40 group-hover:border-gold-300/80 transition-colors">
+          <div className="absolute top-3 left-3 z-10 flex flex-col items-center justify-center w-12 h-14 rounded-xl bg-white/95 backdrop-blur-md shadow-md text-navy-950 border border-white/40 group-hover:border-gold-300/80 transition-colors">
             <span className="text-[10px] font-bold tracking-wider uppercase text-gold-600">
               {dateParts.month}
             </span>
@@ -108,14 +109,14 @@ export function EventCard({ event, className }: EventCardProps) {
           </div>
 
           {/* Status Badge (Top Right) */}
-          <div className="absolute top-3 right-3 shadow-sm">
+          <div className="absolute top-3 right-3 z-10 shadow-sm">
             <StatusBadge status={derivedStatus} />
           </div>
 
-          {/* Category Chip (Bottom Left) */}
-          <div className="absolute bottom-3 left-3">
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-navy-950/80 text-ivory backdrop-blur-md border border-white/20 group-hover:border-gold-400/50 transition-colors">
-              <CategoryIcon className="w-3.5 h-3.5 text-gold-400 group-hover:rotate-6 group-hover:scale-110 transition-transform duration-300" />
+          {/* Category Icon Badge (Bottom Left - Stays clearly visible on top of real photo or vector artwork) */}
+          <div className="absolute bottom-3 left-3 z-10">
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold bg-navy-950/85 text-ivory backdrop-blur-md border border-white/20 shadow-md group-hover:border-gold-400/60 transition-all">
+              <CategoryIcon className="w-3.5 h-3.5 text-gold-400 group-hover:rotate-6 group-hover:scale-110 transition-transform duration-300 shrink-0" />
               <span>{categoryMeta.label}</span>
             </span>
           </div>

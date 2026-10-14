@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/Badge";
 import { Card } from "@/components/ui/Card";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { EventCard, CATEGORY_META } from "@/components/shared/EventCard";
+import { CategoryArtwork } from "@/components/shared/CategoryArtwork";
 import { EventDetailTabs } from "@/components/shared/EventDetailTabs";
 import { EventRegisterCard } from "@/components/shared/EventRegisterCard";
 import { EventsService, type EventWithDerivedStatus } from "@/features/events/services/events.service";
@@ -55,6 +56,14 @@ export default async function EventDetailPage({ params }: EventDetailPageProps) 
       {/* Hero Poster Banner */}
       <section className="max-w-6xl mx-auto px-4 sm:px-6">
         <div className="relative rounded-3xl overflow-hidden bg-gradient-to-br from-navy-950 via-navy-900 to-navy-950 text-ivory border border-navy-800 shadow-xl">
+          {/* Category Icon Badge - On top of poster image or artwork */}
+          <div className="absolute top-4 left-4 sm:top-6 sm:left-6 z-20">
+            <span className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-bold bg-navy-950/85 text-ivory backdrop-blur-md border border-white/20 shadow-lg">
+              <CategoryIcon className="w-4 h-4 text-gold-400 shrink-0" />
+              <span>{categoryMeta.label} Arena</span>
+            </span>
+          </div>
+
           {item.posterUrl ? (
             <div className="relative h-64 sm:h-96 w-full">
               <Image
@@ -68,13 +77,9 @@ export default async function EventDetailPage({ params }: EventDetailPageProps) 
               <div className="absolute inset-0 bg-gradient-to-t from-navy-950 via-navy-950/70 to-transparent" />
             </div>
           ) : (
-            <div className="relative h-56 sm:h-80 w-full flex flex-col items-center justify-center p-6 text-center">
-              <div className="w-20 h-20 rounded-3xl bg-white/10 backdrop-blur-md flex items-center justify-center mb-4">
-                <CategoryIcon className="w-10 h-10 text-gold-400" />
-              </div>
-              <span className="text-xs font-bold uppercase tracking-widest text-gold-400 font-heading">
-                {categoryMeta.label} Arena
-              </span>
+            <div className="relative h-56 sm:h-80 w-full overflow-hidden">
+              <CategoryArtwork category={item.category} showIcon={false} />
+              <div className="absolute inset-0 bg-gradient-to-t from-navy-950 via-navy-950/60 to-transparent" />
             </div>
           )}
 

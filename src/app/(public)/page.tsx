@@ -166,6 +166,13 @@ export default function HomePage() {
                       <div className="absolute inset-0 bg-gradient-to-t from-navy-950 via-navy-950/70 to-transparent" />
                     </div>
 
+                    {/* Small Category Icon Badge (Top Right) */}
+                    <div className="absolute top-3 right-3 z-10">
+                      <span className="w-7 h-7 rounded-lg bg-navy-950/85 backdrop-blur-md border border-white/20 flex items-center justify-center text-gold-400 shadow-md group-hover:scale-110 group-hover:border-gold-400/60 transition-all">
+                        <Icon className="w-3.5 h-3.5" />
+                      </span>
+                    </div>
+
                     {/* Tile Bottom Details */}
                     <div className="relative z-10 flex items-end justify-between gap-2">
                       <div>
