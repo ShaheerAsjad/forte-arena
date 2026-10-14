@@ -151,7 +151,7 @@ export function RegistrationCard({ registration }: RegistrationCardProps) {
       {team && (
         <p className="text-xs text-mist font-medium">
           Team: <span className="font-bold text-navy-950">{team.name}</span> ·{" "}
-          {team.members.length + 1} members
+          {team.members.length} {team.members.length === 1 ? "member" : "members"}
         </p>
       )}
 

@@ -144,16 +144,28 @@ export class RegistrationsRepository {
     eventId: string;
     leaderId: string;
     teamName: string;
+    leaderMember: { fullName: string; rollNumber: string; email?: string; phone?: string };
     members: Array<{ fullName: string; rollNumber: string; email?: string; phone?: string }>;
   }) {
     return prisma.$transaction(async (tx) => {
+      // Put leader as the first member of the team
+      const allMembers = [
+        {
+          fullName: payload.leaderMember.fullName,
+          rollNumber: payload.leaderMember.rollNumber,
+          email: payload.leaderMember.email,
+          phone: payload.leaderMember.phone,
+        },
+        ...payload.members,
+      ];
+
       const team = await tx.team.create({
         data: {
           eventId: payload.eventId,
           leaderId: payload.leaderId,
           name: payload.teamName,
           members: {
-            create: payload.members,
+            create: allMembers,
           },
         },
         select: { id: true },
@@ -165,10 +177,23 @@ export class RegistrationsRepository {
           userId: payload.leaderId,
           teamId: team.id,
         },
-        select: { id: true, status: true },
+        select: { id: true, status: true, teamId: true },
       });
 
       return { team, registration };
+    });
+  }
+
+  /**
+   * Re-fetch team with members and registrations to verify creation.
+   */
+  static async getTeamForVerification(teamId: string) {
+    return prisma.team.findUnique({
+      where: { id: teamId },
+      include: {
+        members: true,
+        registrations: true,
+      },
     });
   }
 

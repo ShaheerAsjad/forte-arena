@@ -107,3 +107,42 @@ export function assertWithdrawAllowed(
     );
   }
 }
+
+// ────────────────────────────────────────────────────────────────
+// Team Leader in Team verification check
+// ────────────────────────────────────────────────────────────────
+
+export function assertLeaderInTeam(
+  team: {
+    leaderId: string;
+    members: Array<{ rollNumber: string }>;
+    registrations?: Array<{ userId: string }>;
+  },
+  expectedLeader: { id: string; rollNumber: string }
+): void {
+  if (team.leaderId !== expectedLeader.id) {
+    throw new AppError(
+      "Team leader ID mismatch.",
+      "LEADER_MISMATCH",
+      500
+    );
+  }
+  const hasMember = team.members.some(
+    (m) => m.rollNumber.trim().toUpperCase() === expectedLeader.rollNumber.trim().toUpperCase()
+  );
+  if (!hasMember) {
+    throw new AppError(
+      "Team leader was not found in team members list.",
+      "LEADER_NOT_IN_MEMBERS",
+      500
+    );
+  }
+  if (team.registrations && !team.registrations.some((r) => r.userId === expectedLeader.id)) {
+    throw new AppError(
+      "Team leader does not have a registration pointing to the team.",
+      "LEADER_REGISTRATION_MISSING",
+      500
+    );
+  }
+}
+

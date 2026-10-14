@@ -14,6 +14,7 @@ import {
   assertTeamSize,
   assertNoDuplicateRollNumbers,
   assertWithdrawAllowed,
+  assertLeaderInTeam,
 } from "./registrations.rules";
 
 // ────────────────────────────────────────────────────────────────
@@ -174,7 +175,7 @@ export async function registerTeam(
     // Check profile
     const dbUser = await prisma.user.findUnique({
       where: { id: user.id },
-      select: { rollNumber: true, department: true, phone: true, name: true },
+      select: { rollNumber: true, department: true, phone: true, name: true, email: true },
     });
     if (!dbUser?.rollNumber || !dbUser.department || !dbUser.phone) {
       return { ok: false, error: "Please complete your profile before registering." };
@@ -198,10 +199,16 @@ export async function registerTeam(
     assertNoDuplicateRollNumbers(allRollNumbers);
 
     // Create team + registration in transaction
-    const { registration } = await RegistrationsRepository.createTeamRegistration({
+    const { team, registration } = await RegistrationsRepository.createTeamRegistration({
       eventId: event.id,
       leaderId: user.id,
       teamName,
+      leaderMember: {
+        fullName: dbUser.name || "Leader",
+        rollNumber: dbUser.rollNumber,
+        email: dbUser.email || user.email || undefined,
+        phone: dbUser.phone || undefined,
+      },
       members: members.map((m) => ({
         fullName: m.fullName,
         rollNumber: m.rollNumber,
@@ -209,6 +216,13 @@ export async function registerTeam(
         phone: m.phone || undefined,
       })),
     });
+
+    // Verification check: re-fetch team and confirm current session user appears in it
+    const createdTeam = await RegistrationsRepository.getTeamForVerification(team.id);
+    if (!createdTeam) {
+      throw new AppError("Team creation failed: could not re-fetch created team.", "TEAM_NOT_FOUND", 500);
+    }
+    assertLeaderInTeam(createdTeam, { id: user.id, rollNumber: dbUser.rollNumber });
 
     revalidatePath(`/events/${eventSlug}`);
     revalidatePath("/dashboard");
