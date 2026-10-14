@@ -14,6 +14,7 @@ import { Trophy, Medal, ArrowRight, Calendar, MapPin } from "lucide-react";
 export default function ResultsIndexPage() {
   return (
     <PageShell
+      badge="Championship Standings"
       title="Festival Results & Champions"
       description="Official standings, award announcements, and verified certificates from completed arenas."
     >
@@ -37,7 +38,7 @@ async function ResultsListLoader() {
         description="Official results and podium placements will appear here once competitions finish and judges publish rankings."
         action={
           <Link href="/events">
-            <Button variant="gold" size="sm">
+            <Button variant="gold" size="sm" withArrow>
               Explore Live Events
             </Button>
           </Link>

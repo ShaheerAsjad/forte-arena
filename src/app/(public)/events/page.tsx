@@ -26,6 +26,7 @@ export default async function EventsPage({ searchParams }: EventsPageProps) {
 
   return (
     <PageShell
+      badge="Festival Schedule"
       title="Festival Competitions & Arenas"
       description="Discover upcoming tournaments, hackathons, showcases, and athletic events across campus."
     >

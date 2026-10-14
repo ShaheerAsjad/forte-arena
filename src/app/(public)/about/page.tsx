@@ -37,6 +37,7 @@ export default function AboutPage() {
 
   return (
     <PageShell
+      badge="Our Mission & Legacy"
       title={`About ${APP_NAME}`}
       description="The premier collegiate festival celebrating technological innovation, sportsmanship, and creative expression."
     >

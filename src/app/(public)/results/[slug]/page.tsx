@@ -17,7 +17,16 @@ export default async function EventResultsPage({ params }: EventResultsPageProps
   const { slug } = await params;
 
   return (
-    <div className="space-y-10 pb-20 max-w-6xl mx-auto px-4 sm:px-6 pt-4">
+    <div className="relative space-y-10 pb-20 max-w-6xl mx-auto px-4 sm:px-6 pt-4 overflow-hidden">
+      {/* Ambient Navy/Gold Mesh Backdrop */}
+      <div className="absolute inset-0 -z-10 pointer-events-none overflow-hidden">
+        <div className="absolute top-[-10%] left-1/2 -translate-x-1/2 w-[900px] h-[450px] bg-[radial-gradient(ellipse_at_center,rgba(245,185,1,0.22),rgba(0,25,105,0.14),transparent_70%)] blur-3xl" />
+        <div className="absolute top-[20%] right-[-10%] w-[500px] h-[350px] bg-[radial-gradient(circle_at_center,rgba(98,136,237,0.16),transparent_65%)] blur-3xl" />
+      </div>
+
+      {/* Blueprint Grid Texture */}
+      <div className="absolute inset-0 -z-10 bg-[linear-gradient(to_right,rgba(0,15,64,0.04)_1px,transparent_1px),linear-gradient(to_bottom,rgba(0,15,64,0.04)_1px,transparent_1px)] bg-[size:4rem_4rem] [mask-image:radial-gradient(ellipse_70%_50%_at_50%_20%,#000_70%,transparent_100%)] pointer-events-none" />
+
       {/* Back button */}
       <div>
         <Link
