@@ -1,6 +1,6 @@
-import { env } from "@/config/env";
+import { APP_TIMEZONE } from "@/config/app";
 
-const TIMEZONE = env.APP_TIMEZONE || "Asia/Karachi";
+const TIMEZONE = APP_TIMEZONE;
 
 export function toDate(date: Date | string | number): Date {
   return typeof date === "string" || typeof date === "number" ? new Date(date) : date;

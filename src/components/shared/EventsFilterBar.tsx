@@ -7,7 +7,7 @@ import { Select } from "@/components/ui/Select";
 import { Button } from "@/components/ui/Button";
 import { Search, X, Filter } from "lucide-react";
 import { CATEGORY_META } from "@/components/shared/EventCard";
-import type { EventCategory } from "@/generated/prisma";
+import type { EventCategory } from "@/lib/db-types";
 
 const ALL_CATEGORIES: { id: string; label: string }[] = [
   { id: "ALL", label: "All Categories" },

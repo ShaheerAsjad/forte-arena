@@ -18,7 +18,7 @@ import {
 } from "lucide-react";
 import type { EventWithDerivedStatus } from "@/features/events/services/events.service";
 import type { EventCardItem } from "@/features/events/repositories/events.repository";
-import type { EventCategory } from "@/generated/prisma";
+import type { EventCategory } from "@/lib/db-types";
 
 export const CATEGORY_META: Record<
   EventCategory,

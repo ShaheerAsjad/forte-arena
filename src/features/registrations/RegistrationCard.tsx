@@ -1,0 +1,178 @@
+import Link from "next/link";
+import { Card } from "@/components/ui/Card";
+import { WithdrawButton } from "@/features/registrations/WithdrawButton";
+import {
+  Circle,
+  CheckCircle2,
+  XCircle,
+  Clock,
+  ArrowUpRight,
+  Calendar,
+  MapPin,
+} from "lucide-react";
+import type { RegistrationCard } from "@/features/registrations/repositories/registrations.repository";
+import type { RegistrationStatus } from "@/lib/db-types";
+
+// ────────────────────────────────────────────────────────────────
+// Status timeline definition
+// ────────────────────────────────────────────────────────────────
+
+const STATUS_TIMELINE: Array<{
+  label: string;
+  statuses: RegistrationStatus[];
+  icon: typeof Circle;
+}> = [
+  { label: "Submitted", statuses: ["PENDING", "APPROVED", "REJECTED", "WITHDRAWN"], icon: Circle },
+  { label: "Under Review", statuses: ["APPROVED", "REJECTED"], icon: Clock },
+  { label: "Decision", statuses: ["APPROVED", "REJECTED"], icon: CheckCircle2 },
+];
+
+function StatusTimeline({ status }: { status: RegistrationStatus }) {
+  if (status === "WITHDRAWN") {
+    return (
+      <div className="flex items-center gap-2 text-mist text-xs font-medium">
+        <XCircle className="w-4 h-4" /> Withdrawn
+      </div>
+    );
+  }
+
+  const stepDone: Record<string, boolean> = {
+    Submitted: true,
+    "Under Review": status === "APPROVED" || status === "REJECTED",
+    Decision: status === "APPROVED" || status === "REJECTED",
+  };
+
+  return (
+    <div className="flex items-center gap-1.5">
+      {STATUS_TIMELINE.map((step, idx) => {
+        const done = stepDone[step.label];
+        const isDecision = step.label === "Decision";
+        const isApproved = status === "APPROVED";
+        const isRejected = status === "REJECTED";
+
+        return (
+          <div key={step.label} className="flex items-center gap-1.5">
+            <div className="flex items-center gap-1">
+              {isDecision && done ? (
+                isRejected ? (
+                  <XCircle className="w-4 h-4 text-danger" />
+                ) : (
+                  <CheckCircle2 className="w-4 h-4 text-success" />
+                )
+              ) : done ? (
+                <CheckCircle2 className="w-4 h-4 text-success" />
+              ) : (
+                <Circle className="w-4 h-4 text-navy-200" />
+              )}
+              <span
+                className={`text-[10px] font-semibold hidden sm:inline ${
+                  done
+                    ? isDecision && isRejected
+                      ? "text-danger"
+                      : "text-success"
+                    : "text-mist"
+                }`}
+              >
+                {isDecision && done ? (isApproved ? "Approved" : "Rejected") : step.label}
+              </span>
+            </div>
+            {idx < STATUS_TIMELINE.length - 1 && (
+              <div
+                className={`h-0.5 w-8 rounded-full ${done ? "bg-success" : "bg-navy-100"}`}
+              />
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ────────────────────────────────────────────────────────────────
+// Status badge pill
+// ────────────────────────────────────────────────────────────────
+
+const STATUS_STYLES: Record<RegistrationStatus, string> = {
+  PENDING: "bg-warning-bg text-warning border-warning/20",
+  APPROVED: "bg-success-bg text-success border-success/20",
+  REJECTED: "bg-danger-bg text-danger border-danger/20",
+  WITHDRAWN: "bg-navy-100 text-mist border-navy-200",
+};
+
+// ────────────────────────────────────────────────────────────────
+// RegistrationCard
+// ────────────────────────────────────────────────────────────────
+
+interface RegistrationCardProps {
+  registration: RegistrationCard;
+}
+
+export function RegistrationCard({ registration }: RegistrationCardProps) {
+  const { event, status, team, createdAt } = registration;
+
+  return (
+    <Card className="p-5 bg-white border border-navy-100 shadow-sm hover:shadow-md transition-shadow space-y-4">
+      {/* Header */}
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex-1 min-w-0">
+          <Link
+            href={`/dashboard/${registration.id}`}
+            className="group inline-flex items-center gap-1.5"
+          >
+            <h3 className="font-bold text-navy-950 group-hover:text-navy-700 transition-colors line-clamp-1 font-heading">
+              {event.title}
+            </h3>
+            <ArrowUpRight className="w-3.5 h-3.5 text-mist group-hover:text-navy-700 transition-colors shrink-0" />
+          </Link>
+          <div className="flex items-center gap-3 mt-1 text-xs text-mist">
+            <span className="flex items-center gap-1">
+              <MapPin className="w-3 h-3" />
+              {event.venue}
+            </span>
+            <span className="flex items-center gap-1">
+              <Calendar className="w-3 h-3" />
+              {new Date(event.startsAt).toLocaleDateString("en-US", {
+                month: "short",
+                day: "numeric",
+                year: "numeric",
+              })}
+            </span>
+          </div>
+        </div>
+
+        <span
+          className={`shrink-0 inline-block px-2.5 py-1 rounded-full text-[10px] font-bold border ${STATUS_STYLES[status]}`}
+        >
+          {status}
+        </span>
+      </div>
+
+      {/* Team name if applicable */}
+      {team && (
+        <p className="text-xs text-mist font-medium">
+          Team: <span className="font-bold text-navy-950">{team.name}</span> ·{" "}
+          {team.members.length + 1} members
+        </p>
+      )}
+
+      {/* Timeline */}
+      <StatusTimeline status={status} />
+
+      {/* Footer */}
+      <div className="flex items-center justify-between pt-2 border-t border-navy-50">
+        <p className="text-[10px] text-mist">
+          Registered{" "}
+          {new Date(createdAt).toLocaleDateString("en-US", {
+            month: "short",
+            day: "numeric",
+          })}
+        </p>
+        <WithdrawButton
+          registrationId={registration.id}
+          status={status}
+          registrationDeadline={new Date(event.registrationDeadline)}
+        />
+      </div>
+    </Card>
+  );
+}

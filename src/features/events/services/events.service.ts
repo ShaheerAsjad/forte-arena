@@ -3,7 +3,7 @@ import {
   type EventCardItem,
   type EventsQueryFilters,
 } from "../repositories/events.repository";
-import type { EventStatus, EventCategory } from "@/generated/prisma";
+import type { EventStatus, EventCategory } from "@/lib/db-types";
 
 export type DerivedEventStatus =
   | "Upcoming"

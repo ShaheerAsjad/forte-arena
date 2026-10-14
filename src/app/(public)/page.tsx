@@ -28,7 +28,7 @@ import {
   Clock,
   Layers,
 } from "lucide-react";
-import type { EventCategory } from "@/generated/prisma";
+import type { EventCategory } from "@/lib/db-types";
 
 export default function HomePage() {
   return (

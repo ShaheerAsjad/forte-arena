@@ -10,18 +10,29 @@ import {
   ArrowRight,
   Lock,
   Calendar,
+  CheckCircle2,
+  LayoutDashboard,
 } from "lucide-react";
 import type { EventWithDerivedStatus } from "@/features/events/services/events.service";
 import type { EventDetailItem } from "@/features/events/repositories/events.repository";
 
+const REGISTRATION_STATUS_STYLES: Record<string, { label: string; className: string }> = {
+  PENDING: { label: "Pending Review", className: "bg-warning-bg text-warning border-warning/20" },
+  APPROVED: { label: "Approved", className: "bg-success-bg text-success border-success/20" },
+  REJECTED: { label: "Rejected", className: "bg-danger-bg text-danger border-danger/20" },
+  WITHDRAWN: { label: "Withdrawn", className: "bg-navy-100 text-mist border-navy-200" },
+};
+
 interface EventRegisterCardProps {
   event: EventWithDerivedStatus<EventDetailItem>;
   isLoggedIn: boolean;
+  existingRegistration?: { id: string; status: string } | null;
 }
 
 export function EventRegisterCard({
   event,
   isLoggedIn,
+  existingRegistration,
 }: EventRegisterCardProps) {
   const { item, derivedStatus, remainingSeats } = event;
 
@@ -30,6 +41,37 @@ export function EventRegisterCard({
 
   const registerHref = `/events/${item.slug}/register`;
   const loginHref = `/login?next=${encodeURIComponent(registerHref)}`;
+
+  // Already registered — show status
+  if (existingRegistration) {
+    const statusMeta = REGISTRATION_STATUS_STYLES[existingRegistration.status] ??
+      REGISTRATION_STATUS_STYLES.PENDING;
+
+    return (
+      <Card className="sticky top-24 p-6 sm:p-7 space-y-5 border border-navy-100 shadow-xl bg-white/95 backdrop-blur-md">
+        <div className="flex items-center gap-2">
+          <CheckCircle2 className="w-5 h-5 text-success" />
+          <p className="font-bold text-navy-950">Already Registered</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <span
+            className={`px-3 py-1 rounded-full text-sm font-bold border ${statusMeta.className}`}
+          >
+            {statusMeta.label}
+          </span>
+        </div>
+        <p className="text-sm text-mist">
+          Your registration is being reviewed by the organisers.
+        </p>
+        <Link href={`/dashboard/${existingRegistration.id}`} className="block">
+          <Button variant="primary" size="lg" className="w-full">
+            <LayoutDashboard className="w-4 h-4 mr-2" />
+            View Registration
+          </Button>
+        </Link>
+      </Card>
+    );
+  }
 
   return (
     <Card className="sticky top-24 p-6 sm:p-7 space-y-6 border border-navy-100 shadow-xl bg-white/95 backdrop-blur-md">
@@ -128,7 +170,7 @@ export function EventRegisterCard({
         )}
 
         <p className="text-center text-[11px] text-mist">
-          Instant submission • Fast organizer review
+          Instant submission • Fast organiser review
         </p>
       </div>
     </Card>

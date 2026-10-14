@@ -10,6 +10,7 @@ import { EventDetailTabs } from "@/components/shared/EventDetailTabs";
 import { EventRegisterCard } from "@/components/shared/EventRegisterCard";
 import { EventsService, type EventWithDerivedStatus } from "@/features/events/services/events.service";
 import type { EventDetailItem } from "@/features/events/repositories/events.repository";
+import { RegistrationsRepository } from "@/features/registrations/repositories/registrations.repository";
 import { getSession } from "@/lib/session";
 import { formatEventFullDate, formatEventTime } from "@/lib/dates";
 import {
@@ -204,5 +205,19 @@ async function EventRegisterSection({
   const session = await getSession();
   const isLoggedIn = !!session?.user;
 
-  return <EventRegisterCard event={event} isLoggedIn={isLoggedIn} />;
+  let existingRegistration: { id: string; status: string } | null = null;
+  if (isLoggedIn && session?.user?.id) {
+    existingRegistration = await RegistrationsRepository.findExistingRegistration(
+      event.item.id,
+      session.user.id
+    );
+  }
+
+  return (
+    <EventRegisterCard
+      event={event}
+      isLoggedIn={isLoggedIn}
+      existingRegistration={existingRegistration}
+    />
+  );
 }

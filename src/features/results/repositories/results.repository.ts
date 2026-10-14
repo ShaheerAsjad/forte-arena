@@ -1,6 +1,6 @@
 import { connection } from "next/server";
 import { prisma } from "@/lib/prisma";
-import type { EventCategory } from "@/generated/prisma";
+import type { EventCategory } from "@/lib/db-types";
 
 export type PublishedResultEvent = {
   id: string;

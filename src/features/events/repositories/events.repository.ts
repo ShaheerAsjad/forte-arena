@@ -1,6 +1,6 @@
 import { connection } from "next/server";
 import { prisma } from "@/lib/prisma";
-import type { EventCategory, EventStatus, ParticipationType } from "@/generated/prisma";
+import type { EventCategory, EventStatus, ParticipationType } from "@/lib/db-types";
 
 export const eventCardSelect = {
   id: true,

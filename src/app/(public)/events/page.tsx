@@ -9,7 +9,7 @@ import { Card } from "@/components/ui/Card";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { EventsService } from "@/features/events/services/events.service";
 import { ChevronLeft, ChevronRight, Inbox } from "lucide-react";
-import type { EventCategory, EventStatus } from "@/generated/prisma";
+import type { EventCategory, EventStatus } from "@/lib/db-types";
 
 interface EventsPageProps {
   searchParams: Promise<{

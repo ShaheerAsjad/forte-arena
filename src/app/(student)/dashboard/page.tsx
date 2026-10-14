@@ -1,40 +1,142 @@
 import { Suspense } from "react";
+import Link from "next/link";
 import { requireUser } from "@/lib/session";
+import { RegistrationsRepository } from "@/features/registrations/repositories/registrations.repository";
+import { DashboardTabs } from "@/features/registrations/DashboardTabs";
 import { SignOutButton } from "./SignOutButton";
+import { Card } from "@/components/ui/Card";
+import { Trophy, ArrowRight, UserCircle } from "lucide-react";
 
 async function DashboardContent() {
   const user = await requireUser("/login?next=/dashboard");
 
+  const registrations = await RegistrationsRepository.getUserRegistrations(
+    user.id
+  );
+
+  const approvedCount = registrations.filter(
+    (r) => r.status === "APPROVED"
+  ).length;
+
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
-      <header className="flex items-center justify-between pb-6 border-b border-zinc-200 dark:border-zinc-800">
+    <div className="space-y-8">
+      {/* Header */}
+      <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-navy-100">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Student Dashboard</h1>
-          <p className="text-zinc-500 dark:text-zinc-400 mt-1">
-            Welcome back, {user.name} ({user.email})
+          <h1 className="text-3xl font-extrabold text-navy-950 font-heading tracking-tight">
+            My Dashboard
+          </h1>
+          <p className="text-mist mt-1 text-sm">
+            Welcome back,{" "}
+            <span className="font-semibold text-navy-900">{user.name}</span>
           </p>
         </div>
-        <SignOutButton />
+        <div className="flex items-center gap-3">
+          <Link
+            href="/profile"
+            className="inline-flex items-center gap-1.5 text-sm font-semibold text-navy-700 hover:text-navy-950 transition"
+          >
+            <UserCircle className="w-4 h-4" />
+            Profile
+          </Link>
+          <SignOutButton />
+        </div>
       </header>
 
-      <div className="p-6 bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 space-y-4">
-        <div className="inline-block px-3 py-1 bg-green-100 dark:bg-green-950 text-green-700 dark:text-green-300 text-xs font-semibold rounded-full">
-          Role: {(user as { role?: string }).role || "STUDENT"}
-        </div>
-        <p className="text-sm text-zinc-600 dark:text-zinc-300">
-          This is the student dashboard placeholder. Auth gating passed successfully!
-        </p>
+      {/* Stats Strip */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        {[
+          {
+            label: "Total Registered",
+            value: registrations.length,
+            color: "navy",
+          },
+          {
+            label: "Pending",
+            value: registrations.filter((r) => r.status === "PENDING").length,
+            color: "warning",
+          },
+          {
+            label: "Approved",
+            value: approvedCount,
+            color: "success",
+          },
+          {
+            label: "Rejected",
+            value: registrations.filter((r) => r.status === "REJECTED").length,
+            color: "danger",
+          },
+        ].map(({ label, value, color }) => (
+          <Card
+            key={label}
+            className={`p-4 bg-white border border-navy-100 text-center`}
+          >
+            <p
+              className={`text-2xl font-extrabold font-heading ${
+                color === "warning"
+                  ? "text-warning"
+                  : color === "success"
+                  ? "text-success"
+                  : color === "danger"
+                  ? "text-danger"
+                  : "text-navy-950"
+              }`}
+            >
+              {value}
+            </p>
+            <p className="text-xs font-medium text-mist mt-0.5">{label}</p>
+          </Card>
+        ))}
       </div>
+
+      {/* Quick Action */}
+      {registrations.length === 0 && (
+        <div className="flex items-start gap-4 p-5 rounded-2xl bg-gradient-to-r from-navy-950 to-navy-800 text-ivory">
+          <div className="w-12 h-12 rounded-xl bg-gold-500/20 flex items-center justify-center shrink-0">
+            <Trophy className="w-6 h-6 text-gold-400" />
+          </div>
+          <div className="flex-1">
+            <p className="font-bold text-base">No registrations yet</p>
+            <p className="text-ivory/70 text-sm mt-0.5">
+              Browse upcoming events and register to compete.
+            </p>
+          </div>
+          <Link
+            href="/events"
+            className="shrink-0 self-center inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-gold-500 text-navy-950 font-semibold text-sm hover:bg-gold-400 transition"
+          >
+            Explore Events
+            <ArrowRight className="w-4 h-4" />
+          </Link>
+        </div>
+      )}
+
+      {/* Registration Tabs */}
+      <DashboardTabs registrations={registrations} />
     </div>
   );
 }
 
 export default function DashboardPage() {
   return (
-    <div className="min-h-screen p-8 bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-50">
-      <Suspense fallback={<div className="p-8 text-center text-zinc-500">Loading dashboard...</div>}>
-        <DashboardContent />
-      </Suspense>
+    <div className="min-h-screen px-4 py-10 sm:px-8 bg-navy-50/40">
+      <div className="max-w-4xl mx-auto">
+        <Suspense
+          fallback={
+            <div className="space-y-4 animate-pulse">
+              <div className="h-12 bg-navy-100 rounded-2xl w-1/2" />
+              <div className="grid grid-cols-4 gap-3">
+                {[1, 2, 3, 4].map((i) => (
+                  <div key={i} className="h-20 bg-white rounded-xl border border-navy-100" />
+                ))}
+              </div>
+              <div className="h-64 bg-white rounded-xl border border-navy-100" />
+            </div>
+          }
+        >
+          <DashboardContent />
+        </Suspense>
+      </div>
     </div>
   );
 }
