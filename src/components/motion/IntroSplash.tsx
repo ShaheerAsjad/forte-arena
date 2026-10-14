@@ -1,12 +1,20 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useSyncExternalStore } from "react";
+import { createPortal } from "react-dom";
 import Image from "next/image";
 import { motion, AnimatePresence, useReducedMotion } from "motion/react";
 
 const LETTERS = "FORTÉ ARENA".split("");
 
+const emptySubscribe = () => () => {};
+
 export function IntroSplash() {
+  const isClient = useSyncExternalStore(
+    emptySubscribe,
+    () => true,
+    () => false
+  );
   const [visible, setVisible] = useState(false);
   const shouldReduceMotion = useReducedMotion();
 
@@ -45,7 +53,22 @@ export function IntroSplash() {
     }
   }, [shouldReduceMotion, handleDismiss]);
 
-  return (
+  // Lock body scroll while splash is visible so no page content can peek or scroll below
+  useEffect(() => {
+    if (visible) {
+      const prevOverflow = document.body.style.overflow;
+      document.body.style.overflow = "hidden";
+      return () => {
+        document.body.style.overflow = prevOverflow;
+      };
+    }
+  }, [visible]);
+
+  if (!isClient || typeof document === "undefined") {
+    return null;
+  }
+
+  return createPortal(
     <AnimatePresence>
       {visible && (
         <motion.div
@@ -56,7 +79,7 @@ export function IntroSplash() {
             opacity: 0,
             transition: { duration: 0.65, ease: [0.65, 0, 0.35, 1] },
           }}
-          className="fixed inset-0 z-50 bg-[#000F40] flex flex-col items-center justify-center text-ivory select-none overflow-hidden"
+          className="fixed inset-0 top-0 left-0 w-screen h-screen min-h-[100dvh] z-[99999] bg-[#000F40] flex flex-col items-center justify-center text-ivory select-none overflow-hidden m-0 p-0"
           role="dialog"
           aria-label="Welcome to Forté Arena"
         >
@@ -184,6 +207,7 @@ export function IntroSplash() {
           </div>
         </motion.div>
       )}
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body
   );
 }
