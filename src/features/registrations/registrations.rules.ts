@@ -146,3 +146,50 @@ export function assertLeaderInTeam(
   }
 }
 
+// ────────────────────────────────────────────────────────────────
+// Active registrations & Re-application rules
+// ────────────────────────────────────────────────────────────────
+
+export const ACTIVE_REGISTRATION_STATUSES: RegistrationStatus[] = [
+  "PENDING",
+  "APPROVED",
+  "REJECTED",
+];
+
+export function isActiveRegistration(status: RegistrationStatus): boolean {
+  return ACTIVE_REGISTRATION_STATUSES.includes(status);
+}
+
+export const MAX_REGISTRATION_ATTEMPTS = 2;
+
+export function parseRegistrationAttempts(notes?: string | null): number {
+  if (!notes) return 1;
+  const match = notes.match(/attempts?:(\d+)/i);
+  if (match && match[1]) {
+    return parseInt(match[1], 10);
+  }
+  return 1;
+}
+
+export function assertCanRegister(
+  existing: { status: RegistrationStatus; notes?: string | null } | null
+): void {
+  if (!existing) return;
+
+  // Active registrations (PENDING, APPROVED, REJECTED) block new registration
+  if (isActiveRegistration(existing.status)) {
+    throw new ConflictError("You already have an active registration for this event.");
+  }
+
+  // If WITHDRAWN, check attempt limit
+  const attempts = parseRegistrationAttempts(existing.notes);
+  if (attempts >= MAX_REGISTRATION_ATTEMPTS) {
+    throw new AppError(
+      "You have reached the maximum limit of 2 registration attempts for this event.",
+      "MAX_ATTEMPTS_EXCEEDED",
+      400
+    );
+  }
+}
+
+

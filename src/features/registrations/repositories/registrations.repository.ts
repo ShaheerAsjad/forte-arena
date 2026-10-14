@@ -113,7 +113,7 @@ export class RegistrationsRepository {
     await connection();
     return prisma.registration.findUnique({
       where: { eventId_userId: { eventId, userId } },
-      select: { id: true, status: true },
+      select: { id: true, status: true, notes: true },
     });
   }
 
@@ -128,17 +128,36 @@ export class RegistrationsRepository {
   }
 
   /**
-   * Create an individual registration.
+   * Create or re-apply an individual registration.
    */
-  static async createIndividualRegistration(eventId: string, userId: string) {
-    return prisma.registration.create({
-      data: { eventId, userId },
+  static async createIndividualRegistration(
+    eventId: string,
+    userId: string,
+    notes = "attempt:1"
+  ) {
+    return prisma.registration.upsert({
+      where: { eventId_userId: { eventId, userId } },
+      create: {
+        eventId,
+        userId,
+        status: "PENDING",
+        notes,
+      },
+      update: {
+        teamId: null,
+        status: "PENDING",
+        notes,
+        rejectionReason: null,
+        reviewedById: null,
+        reviewedAt: null,
+      },
       select: { id: true, status: true },
     });
   }
 
   /**
    * Create a team + team members + leader registration in a single transaction.
+   * Handles re-registration if leader previously withdrew.
    */
   static async createTeamRegistration(payload: {
     eventId: string;
@@ -146,7 +165,9 @@ export class RegistrationsRepository {
     teamName: string;
     leaderMember: { fullName: string; rollNumber: string; email?: string; phone?: string };
     members: Array<{ fullName: string; rollNumber: string; email?: string; phone?: string }>;
+    notes?: string;
   }) {
+    const notes = payload.notes || "attempt:1";
     return prisma.$transaction(async (tx) => {
       // Put leader as the first member of the team
       const allMembers = [
@@ -171,11 +192,27 @@ export class RegistrationsRepository {
         select: { id: true },
       });
 
-      const registration = await tx.registration.create({
-        data: {
+      const registration = await tx.registration.upsert({
+        where: {
+          eventId_userId: {
+            eventId: payload.eventId,
+            userId: payload.leaderId,
+          },
+        },
+        create: {
           eventId: payload.eventId,
           userId: payload.leaderId,
           teamId: team.id,
+          status: "PENDING",
+          notes,
+        },
+        update: {
+          teamId: team.id,
+          status: "PENDING",
+          notes,
+          rejectionReason: null,
+          reviewedById: null,
+          reviewedAt: null,
         },
         select: { id: true, status: true, teamId: true },
       });
@@ -198,12 +235,22 @@ export class RegistrationsRepository {
   }
 
   /**
-   * Withdraw (soft-delete by status update) a registration.
+   * Withdraw (soft-delete by status update) a registration and record withdrawal note.
    */
   static async withdrawRegistration(registrationId: string) {
+    const current = await prisma.registration.findUnique({
+      where: { id: registrationId },
+      select: { notes: true },
+    });
+    const currentAttempts = current?.notes?.match(/attempt:(\d+)/)?.[1] || "1";
+    const withdrawalNote = `attempt:${currentAttempts}|withdrawn:${currentAttempts}`;
+
     return prisma.registration.update({
       where: { id: registrationId },
-      data: { status: "WITHDRAWN" },
+      data: {
+        status: "WITHDRAWN",
+        notes: withdrawalNote,
+      },
       select: { id: true, status: true },
     });
   }

@@ -47,6 +47,7 @@ interface UserProfile {
 interface RegisterStepperProps {
   event: EventInfo;
   profile: UserProfile;
+  isReapplication?: boolean;
 }
 
 const teamMemberSchema = z.object({
@@ -118,7 +119,11 @@ function StepIndicator({
 // Main stepper
 // ────────────────────────────────────────────────────────────────
 
-export function RegisterStepper({ event, profile }: RegisterStepperProps) {
+export function RegisterStepper({
+  event,
+  profile,
+  isReapplication = false,
+}: RegisterStepperProps) {
   const isTeam = event.participationType === "TEAM";
   const steps = isTeam ? TEAM_STEPS : INDIVIDUAL_STEPS;
   const totalSteps = steps.length;
@@ -128,6 +133,18 @@ export function RegisterStepper({ event, profile }: RegisterStepperProps) {
   const [successRegistrationId, setSuccessRegistrationId] = useState<
     string | null
   >(null);
+
+  const reapplicationBanner = isReapplication ? (
+    <div className="p-3.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-xs sm:text-sm flex items-start gap-2.5">
+      <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+      <div>
+        <p className="font-semibold">You withdrew from this once before.</p>
+        <p className="text-xs text-amber-700/90 mt-0.5">
+          You are now submitting your second and final registration attempt for this competition.
+        </p>
+      </div>
+    </div>
+  ) : null;
 
   // Team form
   const {
@@ -192,6 +209,7 @@ export function RegisterStepper({ event, profile }: RegisterStepperProps) {
   if (step === 0) {
     return (
       <div className="space-y-6">
+        {reapplicationBanner}
         <StepIndicator steps={steps} currentStep={0} />
         <div className="space-y-4">
           <h2 className="text-lg font-bold text-navy-950">Your Profile</h2>
@@ -239,6 +257,7 @@ export function RegisterStepper({ event, profile }: RegisterStepperProps) {
   if (isTeam && step === 1) {
     return (
       <div className="space-y-6">
+        {reapplicationBanner}
         <StepIndicator steps={steps} currentStep={1} />
         <div className="space-y-5">
           <h2 className="text-lg font-bold text-navy-950">Team Details</h2>
@@ -380,6 +399,7 @@ export function RegisterStepper({ event, profile }: RegisterStepperProps) {
     const teamValues = isTeam ? getValues() : null;
     return (
       <div className="space-y-6">
+        {reapplicationBanner}
         <StepIndicator steps={steps} currentStep={reviewStepIndex} />
         <div className="space-y-4">
           <h2 className="text-lg font-bold text-navy-950">Review & Submit</h2>

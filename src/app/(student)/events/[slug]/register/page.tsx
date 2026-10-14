@@ -6,6 +6,7 @@ import { EventsRepository } from "@/features/events/repositories/events.reposito
 import { RegistrationsRepository } from "@/features/registrations/repositories/registrations.repository";
 import { prisma } from "@/lib/prisma";
 import { RegisterStepper } from "@/features/registrations/RegisterStepper";
+import { parseRegistrationAttempts } from "@/features/registrations/registrations.rules";
 import { Card } from "@/components/ui/Card";
 import { ArrowLeft, AlertCircle } from "lucide-react";
 
@@ -80,10 +81,34 @@ async function RegisterContent({ slug }: { slug: string }) {
     );
   }
 
-  // Already registered?
+  // Check existing registration
   const existing = await RegistrationsRepository.findExistingRegistration(event.id, user.id);
-  if (existing) {
+  if (existing && existing.status !== "WITHDRAWN") {
     redirect(`/dashboard/${existing.id}`);
+  }
+
+  const isWithdrawn = existing?.status === "WITHDRAWN";
+  const attempts = parseRegistrationAttempts(existing?.notes);
+  if (isWithdrawn && attempts >= 2) {
+    return (
+      <div className="space-y-4">
+        <div className="flex items-start gap-3 p-4 rounded-xl bg-danger-bg border border-danger/30">
+          <AlertCircle className="w-5 h-5 text-danger shrink-0 mt-0.5" />
+          <div>
+            <p className="font-semibold text-danger">Registration Limit Reached</p>
+            <p className="text-sm text-danger/80 mt-0.5">
+              You have withdrawn from this competition twice. You have reached the maximum limit of 2 registration attempts for this event.
+            </p>
+          </div>
+        </div>
+        <Link
+          href={`/events/${slug}`}
+          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-navy-900 text-ivory text-sm font-semibold hover:bg-navy-800 transition"
+        >
+          Back to Event
+        </Link>
+      </div>
+    );
   }
 
   // Profile completeness
@@ -149,6 +174,7 @@ async function RegisterContent({ slug }: { slug: string }) {
           department: dbUser.department,
           phone: dbUser.phone,
         }}
+        isReapplication={isWithdrawn}
       />
     </div>
   );

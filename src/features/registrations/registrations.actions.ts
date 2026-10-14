@@ -15,6 +15,7 @@ import {
   assertNoDuplicateRollNumbers,
   assertWithdrawAllowed,
   assertLeaderInTeam,
+  assertCanRegister,
 } from "./registrations.rules";
 
 // ────────────────────────────────────────────────────────────────
@@ -122,11 +123,9 @@ export async function registerIndividual(
     const approved = await RegistrationsRepository.countApprovedRegistrations(event.id);
     assertSeatsAvailable(event.maxParticipants, approved);
 
-    // Check duplicate
+    // Check duplicate or withdrawal attempt limit
     const existing = await RegistrationsRepository.findExistingRegistration(event.id, user.id);
-    if (existing) {
-      return { ok: false, error: "You are already registered for this event." };
-    }
+    assertCanRegister(existing);
 
     // Check profile completeness
     const dbUser = await prisma.user.findUnique({
@@ -137,7 +136,14 @@ export async function registerIndividual(
       return { ok: false, error: "Please complete your profile before registering." };
     }
 
-    const registration = await RegistrationsRepository.createIndividualRegistration(event.id, user.id);
+    const isReapplying = existing && existing.status === "WITHDRAWN";
+    const notes = isReapplying ? "attempt:2|withdrawn:1" : "attempt:1";
+
+    const registration = await RegistrationsRepository.createIndividualRegistration(
+      event.id,
+      user.id,
+      notes
+    );
 
     revalidatePath(`/events/${eventSlug}`);
     revalidatePath("/dashboard");
@@ -181,11 +187,12 @@ export async function registerTeam(
       return { ok: false, error: "Please complete your profile before registering." };
     }
 
-    // Check duplicate registration for leader
+    // Check duplicate or withdrawal attempt limit for leader
     const existing = await RegistrationsRepository.findExistingRegistration(event.id, user.id);
-    if (existing) {
-      return { ok: false, error: "You are already registered for this event." };
-    }
+    assertCanRegister(existing);
+
+    const isReapplying = existing && existing.status === "WITHDRAWN";
+    const notes = isReapplying ? "attempt:2|withdrawn:1" : "attempt:1";
 
     // Team size: leader counts as 1 + additional members
     const totalMembers = 1 + members.length;
@@ -215,6 +222,7 @@ export async function registerTeam(
         email: m.email || undefined,
         phone: m.phone || undefined,
       })),
+      notes,
     });
 
     // Verification check: re-fetch team and confirm current session user appears in it

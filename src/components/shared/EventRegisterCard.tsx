@@ -12,9 +12,11 @@ import {
   Calendar,
   CheckCircle2,
   LayoutDashboard,
+  AlertCircle,
 } from "lucide-react";
 import type { EventWithDerivedStatus } from "@/features/events/services/events.service";
 import type { EventDetailItem } from "@/features/events/repositories/events.repository";
+import { parseRegistrationAttempts } from "@/features/registrations/registrations.rules";
 
 const REGISTRATION_STATUS_STYLES: Record<string, { label: string; className: string }> = {
   PENDING: { label: "Pending Review", className: "bg-warning-bg text-warning border-warning/20" },
@@ -26,7 +28,7 @@ const REGISTRATION_STATUS_STYLES: Record<string, { label: string; className: str
 interface EventRegisterCardProps {
   event: EventWithDerivedStatus<EventDetailItem>;
   isLoggedIn: boolean;
-  existingRegistration?: { id: string; status: string } | null;
+  existingRegistration?: { id: string; status: string; notes?: string | null } | null;
 }
 
 export function EventRegisterCard({
@@ -42,8 +44,11 @@ export function EventRegisterCard({
   const registerHref = `/events/${item.slug}/register`;
   const loginHref = `/login?next=${encodeURIComponent(registerHref)}`;
 
-  // Already registered — show status
-  if (existingRegistration) {
+  const isWithdrawn = existingRegistration?.status === "WITHDRAWN";
+  const attempts = parseRegistrationAttempts(existingRegistration?.notes);
+
+  // Active registration (PENDING, APPROVED, REJECTED) — show status
+  if (existingRegistration && !isWithdrawn) {
     const statusMeta = REGISTRATION_STATUS_STYLES[existingRegistration.status] ??
       REGISTRATION_STATUS_STYLES.PENDING;
 
@@ -67,6 +72,27 @@ export function EventRegisterCard({
           <Button variant="primary" size="lg" className="w-full">
             <LayoutDashboard className="w-4 h-4 mr-2" />
             View Registration
+          </Button>
+        </Link>
+      </Card>
+    );
+  }
+
+  // Withdrawn 2 or more times (attempt limit reached)
+  if (isWithdrawn && attempts >= 2) {
+    return (
+      <Card className="sticky top-24 p-6 sm:p-7 space-y-5 border border-navy-100 shadow-xl bg-white/95 backdrop-blur-md">
+        <div className="flex items-center gap-2">
+          <AlertCircle className="w-5 h-5 text-mist" />
+          <p className="font-bold text-navy-950">Registration Limit Reached</p>
+        </div>
+        <p className="text-sm text-mist">
+          You have withdrawn from this competition twice. You have reached the maximum limit of 2 registration attempts.
+        </p>
+        <Link href="/dashboard" className="block">
+          <Button variant="outline" size="md" className="w-full">
+            <LayoutDashboard className="w-4 h-4 mr-2" />
+            Go to Dashboard
           </Button>
         </Link>
       </Card>
@@ -140,6 +166,18 @@ export function EventRegisterCard({
             )}
           </div>
         )}
+
+        {isWithdrawn && (
+          <div className="p-3.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-xs sm:text-sm flex items-start gap-2.5">
+            <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+            <div>
+              <p className="font-semibold">You withdrew from this once before.</p>
+              <p className="text-xs text-amber-700/90 mt-0.5">
+                You can re-register once more (attempt 2 of 2).
+              </p>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* CTA Button Action */}
@@ -156,7 +194,7 @@ export function EventRegisterCard({
         ) : isLoggedIn ? (
           <Link href={registerHref} className="block w-full">
             <Button variant="gold" size="lg" className="w-full py-6 text-base shadow-md shadow-gold-500/25">
-              <span>Register Now</span>
+              <span>{isWithdrawn ? "Re-apply for Event" : "Register Now"}</span>
               <ArrowRight className="w-4 h-4 ml-1.5" />
             </Button>
           </Link>
