@@ -2,12 +2,43 @@
 
 import React, { forwardRef } from "react";
 import { cn } from "@/lib/utils";
+import { ArrowRight } from "lucide-react";
 
 export interface ButtonProps
   extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: "primary" | "secondary" | "gold" | "outline" | "ghost" | "danger";
   size?: "sm" | "md" | "lg";
   loading?: boolean;
+  withArrow?: boolean;
+}
+
+const arrowBadgeVariants = {
+  primary: "bg-white/15 text-white group-hover:bg-white/25",
+  secondary: "bg-navy-900/10 text-navy-900 group-hover:bg-navy-900/20",
+  gold: "bg-navy-950/15 text-navy-950 group-hover:bg-navy-950/25",
+  outline: "bg-navy-900/10 text-navy-900 group-hover:bg-navy-900/20",
+  ghost: "bg-navy-900/10 text-navy-900 group-hover:bg-navy-900/20",
+  danger: "bg-white/20 text-white group-hover:bg-white/30",
+};
+
+export function ArrowBadge({
+  variant = "gold",
+  className,
+}: {
+  variant?: "primary" | "secondary" | "gold" | "outline" | "ghost" | "danger";
+  className?: string;
+}) {
+  return (
+    <span
+      className={cn(
+        "inline-flex items-center justify-center w-5 h-5 sm:w-6 sm:h-6 rounded-full shrink-0 transition-transform duration-200 group-hover:translate-x-0.5",
+        arrowBadgeVariants[variant] || arrowBadgeVariants.gold,
+        className
+      )}
+    >
+      <ArrowRight className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+    </span>
+  );
 }
 
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
@@ -17,6 +48,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
       variant = "primary",
       size = "md",
       loading = false,
+      withArrow = false,
       disabled,
       children,
       ...props
@@ -24,7 +56,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
     ref
   ) => {
     const baseStyles =
-      "relative overflow-hidden group inline-flex items-center justify-center font-medium rounded-xl transition-all duration-200 active:scale-[0.98] focus:outline-none focus-visible:ring-2 focus-visible:ring-gold-400 focus-visible:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none disabled:active:scale-100 select-none shadow-sm cursor-pointer";
+      "relative overflow-hidden group inline-flex items-center justify-center font-medium rounded-xl transition-all duration-200 active:scale-[0.98] focus:outline-none focus-visible:ring-2 focus-visible:ring-gold-400 focus-visible:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none disabled:active:scale-100 select-none shadow-sm cursor-pointer whitespace-nowrap";
 
     const variants = {
       primary:
@@ -82,7 +114,19 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
             />
           </svg>
         )}
-        <span className="relative z-10">{children}</span>
+        <span className="relative z-10 inline-flex items-center justify-center gap-2">
+          {children}
+          {withArrow && (
+            <span
+              className={cn(
+                "inline-flex items-center justify-center w-5 h-5 sm:w-6 sm:h-6 rounded-full shrink-0 transition-transform duration-200 group-hover:translate-x-0.5",
+                arrowBadgeVariants[variant]
+              )}
+            >
+              <ArrowRight className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+            </span>
+          )}
+        </span>
       </button>
     );
   }

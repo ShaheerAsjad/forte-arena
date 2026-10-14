@@ -7,7 +7,6 @@ import {
   Clock,
   Users,
   User,
-  ArrowRight,
   Lock,
   Calendar,
   CheckCircle2,
@@ -193,16 +192,14 @@ export function EventRegisterCard({
           </Button>
         ) : isLoggedIn ? (
           <Link href={registerHref} className="block w-full">
-            <Button variant="gold" size="lg" className="w-full py-6 text-base shadow-md shadow-gold-500/25">
+            <Button variant="gold" size="lg" withArrow className="w-full py-6 text-base shadow-md shadow-gold-500/25">
               <span>{isWithdrawn ? "Re-apply for Event" : "Register Now"}</span>
-              <ArrowRight className="w-4 h-4 ml-1.5" />
             </Button>
           </Link>
         ) : (
           <Link href={loginHref} className="block w-full">
-            <Button variant="primary" size="lg" className="w-full py-6 text-base">
+            <Button variant="primary" size="lg" withArrow className="w-full py-6 text-base">
               <span>Sign In to Register</span>
-              <ArrowRight className="w-4 h-4 ml-1.5" />
             </Button>
           </Link>
         )}

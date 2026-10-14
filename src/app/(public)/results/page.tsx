@@ -114,9 +114,11 @@ async function ResultsListLoader() {
                 )}
               </div>
 
-              <div className="flex items-center justify-between pt-2 text-xs font-bold text-navy-900 group-hover:text-gold-600 transition-colors">
+              <div className="flex items-center justify-between pt-2 text-xs font-bold text-navy-900 group-hover:text-navy-700 transition-colors">
                 <span>View Full Standings</span>
-                <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                <span className="w-6 h-6 rounded-full bg-navy-50 border border-navy-200/60 group-hover:bg-gold-500 group-hover:border-gold-400 group-hover:text-navy-950 flex items-center justify-center transition-all duration-200">
+                  <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform text-current" />
+                </span>
               </div>
             </Card>
           </Link>

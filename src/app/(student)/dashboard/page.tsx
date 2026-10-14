@@ -5,7 +5,8 @@ import { RegistrationsRepository } from "@/features/registrations/repositories/r
 import { DashboardTabs } from "@/features/registrations/DashboardTabs";
 import { SignOutButton } from "./SignOutButton";
 import { Card } from "@/components/ui/Card";
-import { Trophy, ArrowRight, UserCircle } from "lucide-react";
+import { Button } from "@/components/ui/Button";
+import { Trophy, UserCircle } from "lucide-react";
 
 async function DashboardContent() {
   const user = await requireUser("/login?next=/dashboard");
@@ -101,12 +102,10 @@ async function DashboardContent() {
               Browse upcoming events and register to compete.
             </p>
           </div>
-          <Link
-            href="/events"
-            className="shrink-0 self-center inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-gold-500 text-navy-950 font-semibold text-sm hover:bg-gold-400 transition"
-          >
-            Explore Events
-            <ArrowRight className="w-4 h-4" />
+          <Link href="/events" className="shrink-0 self-center">
+            <Button variant="gold" size="sm" withArrow>
+              Explore Events
+            </Button>
           </Link>
         </div>
       )}

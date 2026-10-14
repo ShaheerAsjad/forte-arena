@@ -72,9 +72,8 @@ export default function HomePage() {
               <Reveal delay={0.3}>
                 <div className="flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-3.5 pt-2">
                   <Link href="/events" className="w-full sm:w-auto">
-                    <Button variant="gold" size="lg" className="w-full shadow-lg shadow-gold-500/25">
-                      <span>Explore Events</span>
-                      <ArrowRight className="w-4 h-4 ml-2" />
+                    <Button variant="gold" size="lg" withArrow className="w-full shadow-lg shadow-gold-500/25">
+                      Explore Events
                     </Button>
                   </Link>
                   <Link href="/results" className="w-full sm:w-auto">
@@ -119,10 +118,12 @@ export default function HomePage() {
             </div>
             <Link
               href="/events"
-              className="text-sm font-bold text-navy-800 hover:text-navy-600 flex items-center gap-1.5 transition-colors"
+              className="group text-sm font-bold text-navy-800 hover:text-navy-950 inline-flex items-center gap-2 transition-colors"
             >
               <span>View All Competitions</span>
-              <ArrowRight className="w-4 h-4" />
+              <span className="w-6 h-6 rounded-full bg-navy-100 group-hover:bg-gold-500 group-hover:text-navy-950 inline-flex items-center justify-center transition-all duration-200">
+                <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
+              </span>
             </Link>
           </div>
         </Reveal>
@@ -252,10 +253,12 @@ export default function HomePage() {
             </div>
             <Link
               href="/results"
-              className="text-xs sm:text-sm font-bold text-navy-800 hover:text-navy-600 flex items-center gap-1"
+              className="group text-xs sm:text-sm font-bold text-navy-800 hover:text-navy-950 inline-flex items-center gap-2 transition-colors"
             >
               <span>All Results</span>
-              <ArrowRight className="w-3.5 h-3.5" />
+              <span className="w-5 h-5 rounded-full bg-navy-100 group-hover:bg-gold-500 group-hover:text-navy-950 inline-flex items-center justify-center transition-all duration-200">
+                <ArrowRight className="w-3 h-3 group-hover:translate-x-0.5 transition-transform" />
+              </span>
             </Link>
           </div>
         </Reveal>
@@ -336,9 +339,8 @@ async function HeroNextEventCard() {
         </div>
 
         <Link href={`/events/${item.slug}`} className="block">
-          <Button variant="gold" className="w-full py-5 text-sm font-bold shadow-md shadow-gold-500/20">
-            <span>View Competition Details</span>
-            <ArrowRight className="w-4 h-4 ml-1.5" />
+          <Button variant="gold" withArrow className="w-full py-5 text-sm font-bold shadow-md shadow-gold-500/20">
+            View Competition Details
           </Button>
         </Link>
       </Card>
