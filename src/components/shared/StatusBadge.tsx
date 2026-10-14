@@ -28,6 +28,24 @@ export function StatusBadge({ status, size = "md", className }: StatusBadgeProps
     icon: React.ReactNode;
   } => {
     switch (normalized) {
+      case "REGISTRATION OPEN":
+        return {
+          variant: "success",
+          label: "Registration Open",
+          icon: <CheckCircle2 className="w-3.5 h-3.5" />,
+        };
+      case "CLOSING SOON":
+        return {
+          variant: "warning",
+          label: "Closing Soon",
+          icon: <Clock className="w-3.5 h-3.5" />,
+        };
+      case "UPCOMING":
+        return {
+          variant: "info",
+          label: "Upcoming",
+          icon: <Sparkles className="w-3.5 h-3.5" />,
+        };
       case "APPROVED":
         return {
           variant: "success",
@@ -67,7 +85,7 @@ export function StatusBadge({ status, size = "md", className }: StatusBadgeProps
       case "CLOSED":
         return {
           variant: "outline",
-          label: "Registration Closed",
+          label: "Closed",
           icon: <Clock className="w-3.5 h-3.5" />,
         };
       case "DRAFT":

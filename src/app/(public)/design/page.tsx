@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { notFound } from "next/navigation";
 import { PageShell } from "@/components/layout/PageShell";
 import { Button } from "@/components/ui/Button";
 import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/Card";
@@ -25,6 +26,10 @@ import { Inbox } from "lucide-react";
 const SAMPLE_TARGET_DATE = "2026-10-25T18:00:00.000Z";
 
 export default function DesignShowcasePage() {
+  if (process.env.NODE_ENV === "production") {
+    notFound();
+  }
+
   const [modalOpen, setModalOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("all");
 

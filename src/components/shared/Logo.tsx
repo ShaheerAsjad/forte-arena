@@ -24,10 +24,10 @@ export function Logo({
 
   const content = (
     <div className={cn("inline-flex items-center gap-2.5 group select-none", className)}>
-      {/* CSS-cropped circular container for forte-logo.png with scale 1.36 */}
+      {/* Plain container for transparent-background circular brand logo */}
       <div
         className={cn(
-          "relative rounded-full overflow-hidden shrink-0 shadow-sm bg-navy-900 ring-2 ring-gold-400/30 flex items-center justify-center",
+          "relative shrink-0 flex items-center justify-center",
           sizeMap[size].container
         )}
       >
@@ -36,7 +36,7 @@ export function Logo({
           alt={APP_NAME}
           width={120}
           height={120}
-          className="w-full h-full object-cover scale-[1.36] transform"
+          className="w-full h-full object-contain"
           priority
         />
       </div>
