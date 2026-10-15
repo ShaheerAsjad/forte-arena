@@ -3,51 +3,46 @@ import Link from "next/link";
 import { requireRole } from "@/lib/session";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
+import { ResultsRepository } from "@/features/results/repositories/results.repository";
+import { formatEventDate } from "@/lib/dates";
 import {
   Trophy,
-  Award,
-  FileCheck,
-  QrCode,
-  Sparkles,
   ArrowRight,
-  Clock,
-  ShieldCheck,
+  Calendar,
+  Users,
+  MapPin,
+  CheckCircle2,
+  FileQuestion,
+  Sparkles,
 } from "lucide-react";
 
 export const metadata = {
-  title: "Results & Certificates | Organizer Admin Console",
-  description: "Publish tournament results, podium standings, and participant certificates.",
+  title: "Tournament Results | Organizer Console",
+  description: "Publish tournament results, assign podium standings, and distribute awards.",
 };
 
-async function ResultsComingSoonContent() {
+const STATUS_BADGE_CONFIG = {
+  PUBLISHED: {
+    label: "Published",
+    className: "bg-emerald-100 text-emerald-900 border-emerald-200",
+    icon: CheckCircle2,
+  },
+  DRAFT: {
+    label: "Draft",
+    className: "bg-amber-100 text-amber-900 border-amber-200",
+    icon: Sparkles,
+  },
+  NO_RESULTS: {
+    label: "No Results",
+    className: "bg-slate-100 text-slate-700 border-slate-200",
+    icon: FileQuestion,
+  },
+};
+
+async function AdminResultsListContent() {
   await requireRole(["ORGANIZER", "ADMIN"], "/login?next=/admin/results");
 
-  const UPCOMING_CAPABILITIES = [
-    {
-      icon: Trophy,
-      title: "Podium Standings & Leaderboards",
-      description:
-        "Assign 1st, 2nd, and 3rd place rankings, honorable mentions, and runners-up directly from registration rosters.",
-    },
-    {
-      icon: FileCheck,
-      title: "Automated Certificate Issuance",
-      description:
-        "Generate verified e-certificates for winners and approved participants with official institution stamps.",
-    },
-    {
-      icon: QrCode,
-      title: "Cryptographic QR Verification",
-      description:
-        "Every certificate gets a unique cryptographic hash and public QR code for external verification.",
-    },
-    {
-      icon: Award,
-      title: "Custom Organizer Signatures",
-      description:
-        "Configure digital signatures for campus society leads, faculty patrons, and student affairs deans.",
-    },
-  ];
+  const events = await ResultsRepository.getAdminEligibleEvents();
 
   return (
     <div className="space-y-8 animate-in fade-in duration-300">
@@ -56,89 +51,121 @@ async function ResultsComingSoonContent() {
         <div>
           <div className="flex items-center gap-2 mb-1.5">
             <span className="text-[10px] font-extrabold uppercase tracking-widest text-gold-600 bg-gold-100/90 border border-gold-300 px-2.5 py-0.5 rounded-full">
-              MODULE IN STAGING
+              Results & Standings
             </span>
-            <span className="text-xs text-mist font-medium flex items-center gap-1">
-              <Clock className="w-3.5 h-3.5" /> Coming in Next Release
+            <span className="text-xs text-mist font-medium">
+              • Completed & Past Events
             </span>
           </div>
           <h1 className="text-2xl sm:text-3xl font-extrabold text-navy-950 font-heading">
-            Results & Certificate Distribution
+            Tournament Results Manager
           </h1>
           <p className="text-sm text-mist mt-1 max-w-2xl">
-            Publish tournament winners, generate participant certificates, and distribute digital credentials to student dashboards.
+            Assign podium standings, record scores, and publish public results for campus competitions.
           </p>
         </div>
 
         <Link href="/admin/events">
           <Button variant="outline" size="sm" className="font-semibold shadow-xs">
-            <span>Manage Live Events</span>
+            <span>View All Arenas</span>
             <ArrowRight className="w-4 h-4 ml-1.5" />
           </Button>
         </Link>
       </div>
 
-      {/* Hero Showcase Card */}
-      <Card className="p-6 sm:p-8 bg-gradient-to-br from-white via-navy-50/30 to-gold-50/20 border border-navy-100 shadow-sm rounded-3xl relative overflow-hidden">
-        <div className="absolute top-0 right-0 w-80 h-80 bg-gold-400/10 rounded-full blur-3xl pointer-events-none" />
-
-        <div className="max-w-2xl space-y-4">
-          <div className="w-12 h-12 rounded-2xl bg-navy-900 text-gold-400 flex items-center justify-center shadow-md">
+      {/* Events List / Table */}
+      {events.length === 0 ? (
+        <Card className="p-12 text-center space-y-3 bg-white border border-navy-100 rounded-3xl">
+          <div className="w-12 h-12 rounded-2xl bg-navy-50 flex items-center justify-center text-gold-500 mx-auto">
             <Trophy className="w-6 h-6" />
           </div>
-
-          <div className="space-y-2">
-            <h2 className="text-xl sm:text-2xl font-bold text-navy-950 font-heading">
-              Official Tournament Standings & Digital Awards
-            </h2>
-            <p className="text-xs sm:text-sm text-mist leading-relaxed">
-              Once an event concludes, organizers will be able to lock final standings, record scores or times, and publish public results. Certificates will then automatically appear in the Results tab for participants.
-            </p>
+          <h3 className="font-heading text-lg font-bold text-navy-950">
+            No Completed Events Found
+          </h3>
+          <p className="text-xs sm:text-sm text-mist max-w-md mx-auto">
+            Results can be managed once events reach their completion or end date. Check the Events tab to update event statuses.
+          </p>
+          <div className="pt-2">
+            <Link href="/admin/events">
+              <Button variant="primary" size="sm">
+                Go to Events Console
+              </Button>
+            </Link>
           </div>
+        </Card>
+      ) : (
+        <div className="grid grid-cols-1 gap-4">
+          {events.map((ev) => {
+            const badge = STATUS_BADGE_CONFIG[ev.statusBadge];
+            const BadgeIcon = badge.icon;
 
-          <div className="pt-2 flex flex-wrap items-center gap-3">
-            <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white border border-navy-100 text-navy-900 text-xs font-semibold shadow-2xs">
-              <ShieldCheck className="w-4 h-4 text-emerald-600" />
-              <span>Tamper-proof Verification</span>
-            </div>
-            <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white border border-navy-100 text-navy-900 text-xs font-semibold shadow-2xs">
-              <Sparkles className="w-4 h-4 text-gold-500" />
-              <span>Instant PDF Generation</span>
-            </div>
-          </div>
-        </div>
-      </Card>
-
-      {/* Feature Grid */}
-      <div>
-        <h3 className="text-sm font-bold uppercase tracking-wider text-mist mb-4 font-heading">
-          Feature Blueprint
-        </h3>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          {UPCOMING_CAPABILITIES.map((cap) => {
-            const Icon = cap.icon;
             return (
               <Card
-                key={cap.title}
-                className="p-5 bg-white border border-navy-100 shadow-xs rounded-2xl space-y-2 hover:border-gold-300 transition-colors"
+                key={ev.id}
+                className="p-5 sm:p-6 bg-white border border-navy-100 hover:border-gold-300 transition-colors shadow-xs rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-5"
               >
-                <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-xl bg-navy-50 flex items-center justify-center text-navy-800 shrink-0">
-                    <Icon className="w-4 h-4 text-navy-700" />
+                {/* Event info */}
+                <div className="space-y-2 flex-1 min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span
+                      className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold border ${badge.className}`}
+                    >
+                      <BadgeIcon className="w-3.5 h-3.5" />
+                      <span>{badge.label}</span>
+                    </span>
+
+                    <span className="text-[11px] font-semibold text-navy-900 bg-navy-50 px-2 py-0.5 rounded-md border border-navy-100">
+                      {ev.category}
+                    </span>
+
+                    <span className="text-[11px] font-medium text-mist">
+                      {ev.participationType === "TEAM" ? "Team Event" : "Solo Event"}
+                    </span>
                   </div>
-                  <h4 className="font-heading font-bold text-sm text-navy-950">
-                    {cap.title}
-                  </h4>
+
+                  <h3 className="font-heading text-lg font-extrabold text-navy-950 truncate">
+                    {ev.title}
+                  </h3>
+
+                  <div className="flex flex-wrap items-center gap-4 text-xs text-mist pt-0.5">
+                    <span className="flex items-center gap-1.5">
+                      <Calendar className="w-3.5 h-3.5 text-gold-500" />
+                      <span>{formatEventDate(ev.startsAt)}</span>
+                    </span>
+                    <span className="flex items-center gap-1.5">
+                      <MapPin className="w-3.5 h-3.5 text-gold-500" />
+                      <span>{ev.venue}</span>
+                    </span>
+                    <span className="flex items-center gap-1.5">
+                      <Users className="w-3.5 h-3.5 text-navy-700" />
+                      <span>{ev.approvedCount} Approved Participants</span>
+                    </span>
+                  </div>
                 </div>
-                <p className="text-xs text-mist leading-relaxed pl-12">
-                  {cap.description}
-                </p>
+
+                {/* Status counts & Action */}
+                <div className="flex items-center justify-between md:justify-end gap-4 shrink-0 pt-3 md:pt-0 border-t md:border-t-0 border-navy-50">
+                  <div className="text-right">
+                    <div className="font-heading text-lg font-black text-navy-950">
+                      {ev.resultCount}
+                    </div>
+                    <span className="text-[11px] font-medium text-mist">
+                      {ev.resultCount === 1 ? "Result Entered" : "Results Entered"}
+                    </span>
+                  </div>
+
+                  <Link href={`/admin/results/${ev.id}`}>
+                    <Button variant="gold" size="sm" className="font-semibold shadow-xs">
+                      <Trophy className="w-4 h-4 mr-1.5" />
+                      <span>Manage Results</span>
+                    </Button>
+                  </Link>
+                </div>
               </Card>
             );
           })}
         </div>
-      </div>
+      )}
     </div>
   );
 }
@@ -149,11 +176,15 @@ export default function AdminResultsPage() {
       fallback={
         <div className="space-y-6 animate-pulse">
           <div className="h-20 bg-navy-100/50 rounded-2xl w-full" />
-          <div className="h-64 bg-navy-100/50 rounded-3xl w-full" />
+          <div className="space-y-4">
+            <div className="h-28 bg-navy-100/40 rounded-2xl w-full" />
+            <div className="h-28 bg-navy-100/40 rounded-2xl w-full" />
+            <div className="h-28 bg-navy-100/40 rounded-2xl w-full" />
+          </div>
         </div>
       }
     >
-      <ResultsComingSoonContent />
+      <AdminResultsListContent />
     </Suspense>
   );
 }
