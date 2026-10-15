@@ -6,12 +6,14 @@ interface HeadlineWordsProps {
   text: string;
   highlightText?: string;
   className?: string;
+  highlightClassName?: string;
 }
 
 export function HeadlineWords({
   text,
   highlightText,
   className = "",
+  highlightClassName = "text-transparent bg-clip-text bg-gradient-to-r from-gold-400 via-amber-300 to-gold-500 drop-shadow-xs",
 }: HeadlineWordsProps) {
   const shouldReduceMotion = useReducedMotion();
   const words = text.split(" ");
@@ -21,7 +23,7 @@ export function HeadlineWords({
       <h1 className={className}>
         {words.join(" ")}{" "}
         {highlightText && (
-          <span className="text-transparent bg-clip-text bg-gradient-to-r from-navy-900 via-navy-700 to-gold-500">
+          <span className={highlightClassName}>
             {highlightText}
           </span>
         )}
@@ -71,7 +73,7 @@ export function HeadlineWords({
       {highlightText && (
         <motion.span
           variants={child}
-          className="inline-block text-transparent bg-clip-text bg-gradient-to-r from-navy-900 via-navy-700 to-gold-500"
+          className={`inline-block ${highlightClassName}`}
         >
           {highlightText}
         </motion.span>

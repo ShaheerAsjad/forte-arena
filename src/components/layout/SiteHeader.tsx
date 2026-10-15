@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
@@ -35,8 +35,20 @@ export function SiteHeader() {
   const router = useRouter();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
+  const [isScrolled, setIsScrolled] = useState(false);
   const { data: session } = useSession();
   const user = session?.user;
+
+  useEffect(() => {
+    const handleScroll = () => {
+      setIsScrolled(window.scrollY > 400);
+    };
+    handleScroll();
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
+
+  const isDarkHero = pathname === "/" && !isScrolled;
 
   const handleSignOut = async () => {
     setProfileMenuOpen(false);
@@ -55,12 +67,26 @@ export function SiteHeader() {
   return (
     <header className="sticky top-4 z-40 w-full px-4 sm:px-6 max-w-6xl mx-auto">
       {/* Floating Translucent Pill Bar */}
-      <div className="flex items-center justify-between px-5 py-3 rounded-full bg-white/85 backdrop-blur-md border border-navy-100/70 shadow-lg shadow-navy-950/5 transition-all">
+      <div
+        className={cn(
+          "flex items-center justify-between px-5 py-3 rounded-full backdrop-blur-md transition-all duration-300",
+          isDarkHero
+            ? "bg-navy-950/80 border border-white/15 shadow-xl shadow-navy-950/30 text-ivory [&_span]:text-ivory"
+            : "bg-white/90 border border-navy-100/70 shadow-lg shadow-navy-950/5 text-navy-950"
+        )}
+      >
         {/* Logo */}
         <Logo size="md" />
 
         {/* Desktop Nav Links */}
-        <nav className="hidden md:flex items-center gap-1 bg-navy-50/70 p-1 rounded-full border border-navy-100/40 relative">
+        <nav
+          className={cn(
+            "hidden md:flex items-center gap-1 p-1 rounded-full border relative transition-colors",
+            isDarkHero
+              ? "bg-white/10 border-white/15"
+              : "bg-navy-50/70 border-navy-100/40"
+          )}
+        >
           {NAV_LINKS.map((link) => {
             const isActive =
               link.href === "/"
@@ -74,14 +100,21 @@ export function SiteHeader() {
                 className={cn(
                   "relative group px-4 py-1.5 rounded-full text-sm font-medium transition-colors select-none",
                   isActive
-                    ? "text-ivory font-semibold"
+                    ? isDarkHero
+                      ? "text-navy-950 font-bold"
+                      : "text-ivory font-semibold"
+                    : isDarkHero
+                    ? "text-ivory/80 hover:text-white"
                     : "text-ink/80 hover:text-navy-900"
                 )}
               >
                 {isActive && (
                   <motion.div
                     layoutId="activeNavPill"
-                    className="absolute inset-0 bg-navy-900 rounded-full shadow-xs -z-10"
+                    className={cn(
+                      "absolute inset-0 rounded-full shadow-xs -z-10",
+                      isDarkHero ? "bg-gold-400" : "bg-navy-900"
+                    )}
                     transition={{ type: "spring", stiffness: 380, damping: 30 }}
                   />
                 )}
@@ -104,13 +137,18 @@ export function SiteHeader() {
                 onClick={() => setProfileMenuOpen(!profileMenuOpen)}
                 aria-label="User profile menu"
                 aria-expanded={profileMenuOpen}
-                className="flex items-center gap-2 p-1 pl-1.5 pr-2.5 rounded-full bg-navy-50/80 hover:bg-navy-100/90 border border-navy-200/60 transition-all cursor-pointer group focus:outline-none focus:ring-2 focus:ring-gold-400"
+                className={cn(
+                  "flex items-center gap-2 p-1 pl-1.5 pr-2.5 rounded-full border transition-all cursor-pointer group focus:outline-none focus:ring-2 focus:ring-gold-400",
+                  isDarkHero
+                    ? "bg-white/10 hover:bg-white/15 border-white/20 text-ivory"
+                    : "bg-navy-50/80 hover:bg-navy-100/90 border-navy-200/60"
+                )}
               >
                 <div className="w-8 h-8 rounded-full bg-gradient-to-br from-navy-900 to-navy-800 text-gold-400 border border-gold-400/50 flex items-center justify-center text-xs font-bold shadow-xs group-hover:border-gold-400 transition-colors overflow-hidden">
                   {user.image ? (
                     <Image
                       src={user.image}
-                      alt={user.name || "Avatar"}
+                      alt={user.name || "User avatar"}
                       width={32}
                       height={32}
                       className="w-full h-full object-cover"
@@ -119,26 +157,21 @@ export function SiteHeader() {
                     <span>{userInitial}</span>
                   )}
                 </div>
-                <span className="text-xs font-semibold text-navy-950 max-w-[110px] truncate">
-                  {user.name?.split(" ")[0] || "Student"}
+                <span className="text-xs font-semibold max-w-[100px] truncate">
+                  {user.name?.split(" ")[0] || "Account"}
                 </span>
-                <ChevronDown
-                  className={cn(
-                    "w-3.5 h-3.5 text-mist transition-transform duration-200",
-                    profileMenuOpen && "rotate-180"
-                  )}
-                />
+                <ChevronDown className="w-3.5 h-3.5 text-mist group-hover:text-gold-500 transition-colors" />
               </button>
 
-              {/* Profile Dropdown */}
+              {/* Profile Dropdown Menu */}
               {profileMenuOpen && (
                 <>
                   <div
                     className="fixed inset-0 z-40"
                     onClick={() => setProfileMenuOpen(false)}
                   />
-                  <div className="absolute right-0 top-full mt-2 w-56 rounded-2xl bg-white border border-navy-100 shadow-xl shadow-navy-950/10 p-2 z-50 animate-in fade-in zoom-in-95 duration-150">
-                    <div className="px-3 py-2 border-b border-navy-50 mb-1">
+                  <div className="absolute right-0 top-full mt-2 w-56 rounded-2xl bg-white border border-navy-100 shadow-xl py-2 z-50 animate-in fade-in slide-in-from-top-2 duration-150">
+                    <div className="px-4 py-2 border-b border-navy-50">
                       <p className="text-xs font-bold text-navy-950 truncate">
                         {user.name || "Student"}
                       </p>
@@ -146,37 +179,40 @@ export function SiteHeader() {
                         {user.email}
                       </p>
                     </div>
+
                     <Link
                       href="/dashboard"
                       onClick={() => setProfileMenuOpen(false)}
-                      className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-navy-950 hover:bg-navy-50 transition"
+                      className="flex items-center gap-2 px-4 py-2 text-xs font-medium text-navy-900 hover:bg-navy-50 transition"
                     >
                       <LayoutDashboard className="w-4 h-4 text-gold-600" />
-                      <span>Dashboard</span>
+                      <span>My Registrations</span>
                     </Link>
+
                     <Link
                       href="/profile"
                       onClick={() => setProfileMenuOpen(false)}
-                      className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-navy-950 hover:bg-navy-50 transition"
+                      className="flex items-center gap-2 px-4 py-2 text-xs font-medium text-navy-900 hover:bg-navy-50 transition"
                     >
-                      <UserIcon className="w-4 h-4 text-navy-600" />
+                      <UserIcon className="w-4 h-4 text-gold-600" />
                       <span>Edit Profile</span>
                     </Link>
-                    {((user as { role?: string })?.role === "ORGANIZER" ||
-                      (user as { role?: string })?.role === "ADMIN") && (
+
+                    {((user as unknown as { role?: string }).role === "ORGANIZER" ||
+                      (user as unknown as { role?: string }).role === "ADMIN") && (
                       <Link
                         href="/admin"
                         onClick={() => setProfileMenuOpen(false)}
-                        className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-purple-900 hover:bg-purple-50 transition"
+                        className="flex items-center gap-2 px-4 py-2 text-xs font-semibold text-gold-600 bg-gold-50/50 hover:bg-gold-50 transition border-y border-gold-100"
                       >
-                        <Shield className="w-4 h-4 text-purple-600" />
-                        <span>Admin Console</span>
+                        <Shield className="w-4 h-4 text-gold-600" />
+                        <span>Organizer Console</span>
                       </Link>
                     )}
-                    <div className="my-1 border-t border-navy-50" />
+
                     <button
                       onClick={handleSignOut}
-                      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-danger hover:bg-danger-bg transition cursor-pointer"
+                      className="w-full flex items-center gap-2 px-4 py-2 text-xs font-medium text-danger hover:bg-danger-bg transition text-left cursor-pointer"
                     >
                       <LogOut className="w-4 h-4" />
                       <span>Sign out</span>
@@ -189,7 +225,10 @@ export function SiteHeader() {
             <>
               <Link
                 href="/login"
-                className="px-4 py-2 text-sm font-medium text-navy-950 hover:text-navy-700 transition"
+                className={cn(
+                  "px-4 py-2 text-sm font-medium transition",
+                  isDarkHero ? "text-ivory/90 hover:text-white" : "text-navy-950 hover:text-navy-700"
+                )}
               >
                 Sign In
               </Link>
@@ -208,11 +247,15 @@ export function SiteHeader() {
         <button
           onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
           aria-label="Toggle Navigation"
-          className="md:hidden p-2 rounded-full text-navy-950 hover:bg-navy-100 transition cursor-pointer"
+          className={cn(
+            "md:hidden p-2 rounded-full transition cursor-pointer",
+            isDarkHero ? "text-ivory hover:bg-white/10" : "text-navy-950 hover:bg-navy-100"
+          )}
         >
           {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
         </button>
       </div>
+
 
       {/* Mobile Full-Screen / Bottom Sheet Menu */}
       {mobileMenuOpen && (

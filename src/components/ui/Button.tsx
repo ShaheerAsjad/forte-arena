@@ -9,6 +9,7 @@ export interface ButtonProps
   variant?: "primary" | "secondary" | "gold" | "outline" | "ghost" | "danger";
   size?: "sm" | "md" | "lg";
   loading?: boolean;
+  isLoading?: boolean;
   withArrow?: boolean;
 }
 
@@ -48,6 +49,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
       variant = "primary",
       size = "md",
       loading = false,
+      isLoading = false,
       withArrow = false,
       disabled,
       children,
@@ -55,6 +57,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
     },
     ref
   ) => {
+    const isCurrentlyLoading = loading || isLoading;
     const baseStyles =
       "relative overflow-hidden group inline-flex items-center justify-center font-medium rounded-xl transition-all duration-200 active:scale-[0.98] focus:outline-none focus-visible:ring-2 focus-visible:ring-gold-400 focus-visible:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none disabled:active:scale-100 select-none shadow-sm cursor-pointer whitespace-nowrap";
 
@@ -82,7 +85,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
     return (
       <button
         ref={ref}
-        disabled={disabled || loading}
+        disabled={disabled || isCurrentlyLoading}
         className={cn(baseStyles, variants[variant], sizes[size], className)}
         {...props}
       >
@@ -92,7 +95,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
           aria-hidden="true"
         />
 
-        {loading && (
+        {isCurrentlyLoading && (
           <svg
             className="animate-spin -ml-1 mr-2 h-4 w-4 shrink-0 text-current"
             xmlns="http://www.w3.org/2000/svg"

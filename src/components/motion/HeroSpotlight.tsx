@@ -44,74 +44,101 @@ export function HeroSpotlight({ children }: { children?: React.ReactNode }) {
       onMouseMove={handleMouseMove}
       onMouseEnter={() => setIsHovering(true)}
       onMouseLeave={() => setIsHovering(false)}
-      className="relative w-full overflow-hidden"
+      className="relative w-full overflow-hidden bg-gradient-to-b from-[#000826] via-[#00134d] to-[#001969] text-ivory"
     >
-      {/* Visibly Rich Navy/Gold Ambient Mesh Gradient with Fluid Motion */}
+      {/* 1. Ambient Glows & Aurora Blobs */}
       <div className="absolute inset-0 -z-10 pointer-events-none overflow-hidden">
-        {/* Top/Center Gold Crown Orb */}
-        <motion.div
-          animate={
-            shouldReduceMotion
-              ? {}
-              : {
-                  x: [0, 35, -25, 0],
-                  y: [0, -25, 15, 0],
-                  scale: [1, 1.08, 0.94, 1],
-                }
-          }
-          transition={{ duration: 16, repeat: Infinity, ease: "easeInOut" }}
-          className="absolute top-[-22%] left-1/2 -translate-x-1/2 w-[980px] h-[600px] bg-[radial-gradient(ellipse_at_center,rgba(245,185,1,0.32),rgba(0,25,105,0.22),transparent_72%)] blur-3xl"
-        />
+        {/* Big Gold Radial Glow Top-Right */}
+        <div className="absolute -top-[15%] right-[-10%] w-[750px] h-[650px] bg-[radial-gradient(circle_at_center,rgba(245,185,1,0.55),rgba(214,162,0,0.22),transparent_70%)] blur-[90px] pointer-events-none" />
 
-        {/* Right Cobalt/Navy Wave */}
-        <motion.div
-          animate={
-            shouldReduceMotion
-              ? {}
-              : {
-                  x: [0, -40, 30, 0],
-                  y: [0, 35, -20, 0],
-                  scale: [1, 0.92, 1.08, 1],
-                }
-          }
-          transition={{ duration: 20, repeat: Infinity, ease: "easeInOut" }}
-          className="absolute top-[8%] right-[-10%] w-[680px] h-[520px] bg-[radial-gradient(circle_at_center,rgba(0,25,105,0.28),rgba(98,136,237,0.24),transparent_68%)] blur-3xl"
-        />
+        {/* Big Blue / Indigo Radial Glow Bottom-Left */}
+        <div className="absolute -bottom-[10%] left-[-10%] w-[720px] h-[600px] bg-[radial-gradient(circle_at_center,rgba(67,97,238,0.6),rgba(0,25,105,0.35),transparent_70%)] blur-[100px] pointer-events-none" />
 
-        {/* Left Warm Amber Gold Wave */}
+        {/* Slow Animated Aurora Blob 1 (Gold/Amber, Opacity 0.65) */}
         <motion.div
           animate={
             shouldReduceMotion
               ? {}
               : {
-                  x: [0, 30, -35, 0],
-                  y: [0, 25, -25, 0],
-                  scale: [1, 1.06, 0.94, 1],
+                  x: [0, 45, -30, 0],
+                  y: [0, -35, 25, 0],
+                  scale: [1, 1.15, 0.92, 1],
                 }
           }
           transition={{ duration: 18, repeat: Infinity, ease: "easeInOut" }}
-          className="absolute top-[5%] left-[-10%] w-[640px] h-[500px] bg-[radial-gradient(circle_at_center,rgba(245,185,1,0.28),rgba(214,162,0,0.2),transparent_65%)] blur-3xl"
+          className="absolute top-[5%] left-[20%] w-[680px] h-[520px] bg-[radial-gradient(ellipse_at_center,rgba(245,185,1,0.48),rgba(214,162,0,0.2),transparent_68%)] blur-[95px] opacity-75"
         />
 
-        {/* Mid-Depth Royal Navy Accent */}
-        <div className="absolute top-[45%] left-1/3 -translate-x-1/2 w-[600px] h-[350px] bg-[radial-gradient(ellipse_at_center,rgba(0,15,64,0.16),transparent_70%)] blur-3xl" />
+        {/* Slow Animated Aurora Blob 2 (Cobalt/Royal Navy, Opacity 0.7) */}
+        <motion.div
+          animate={
+            shouldReduceMotion
+              ? {}
+              : {
+                  x: [0, -50, 40, 0],
+                  y: [0, 40, -30, 0],
+                  scale: [1, 0.9, 1.12, 1],
+                }
+          }
+          transition={{ duration: 22, repeat: Infinity, ease: "easeInOut" }}
+          className="absolute top-[25%] right-[15%] w-[620px] h-[480px] bg-[radial-gradient(circle_at_center,rgba(59,130,246,0.5),rgba(0,25,105,0.3),transparent_65%)] blur-[90px] opacity-70"
+        />
+
+        {/* Slow Animated Aurora Blob 3 (Cyan/Electric Accent, Opacity 0.55) */}
+        <motion.div
+          animate={
+            shouldReduceMotion
+              ? {}
+              : {
+                  x: [0, 30, -40, 0],
+                  y: [0, -20, 35, 0],
+                  scale: [1, 1.08, 0.95, 1],
+                }
+          }
+          transition={{ duration: 25, repeat: Infinity, ease: "easeInOut" }}
+          className="absolute top-[40%] left-[35%] w-[500px] h-[400px] bg-[radial-gradient(circle_at_center,rgba(34,211,238,0.35),transparent_70%)] blur-[80px] opacity-60"
+        />
+
+        {/* Soft Diagonal Light Beams */}
+        <div className="absolute -inset-x-20 top-0 h-[600px] bg-gradient-to-tr from-transparent via-gold-400/[0.07] to-transparent rotate-12 blur-2xl pointer-events-none" />
+        <div className="absolute -inset-x-20 top-20 h-[500px] bg-gradient-to-bl from-transparent via-blue-400/[0.08] to-transparent -rotate-12 blur-2xl pointer-events-none" />
       </div>
 
-      {/* Faint Grid Texture Overlay */}
-      <div className="absolute inset-0 -z-10 bg-[linear-gradient(to_right,rgba(0,15,64,0.06)_1px,transparent_1px),linear-gradient(to_bottom,rgba(0,15,64,0.06)_1px,transparent_1px)] bg-[size:4rem_4rem] [mask-image:radial-gradient(ellipse_65%_55%_at_50%_35%,#000_75%,transparent_100%)] pointer-events-none" />
+      {/* 2. Fine Grid Pattern Overlay */}
+      <div className="absolute inset-0 -z-10 bg-[linear-gradient(to_right,rgba(255,255,255,0.06)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.06)_1px,transparent_1px)] bg-[size:3.5rem_3.5rem] [mask-image:radial-gradient(ellipse_75%_65%_at_50%_40%,#000_65%,transparent_100%)] pointer-events-none" />
 
-      {/* Interactive Mouse Spotlight (Fine Pointer Only) */}
+      {/* 3. Subtle Film Grain / Noise Overlay */}
+      <div
+        className="absolute inset-0 -z-10 opacity-30 mix-blend-overlay pointer-events-none"
+        style={{
+          backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.35'/%3E%3C/svg%3E")`,
+        }}
+      />
+
+      {/* 4. Interactive Mouse Spotlight (Fine Pointer Only) */}
       {isPointerDevice && !shouldReduceMotion && (
         <div
           className="absolute inset-0 -z-10 pointer-events-none transition-opacity duration-500 ease-out"
           style={{
             opacity: isHovering ? 1 : 0,
-            background: `radial-gradient(650px circle at ${mousePos.x}px ${mousePos.y}px, rgba(245, 185, 1, 0.28), rgba(0, 25, 105, 0.12), transparent 70%)`,
+            background: `radial-gradient(650px circle at ${mousePos.x}px ${mousePos.y}px, rgba(245, 185, 1, 0.32), rgba(67, 97, 238, 0.18), transparent 70%)`,
           }}
         />
       )}
 
-      {children}
+      {/* Main Content */}
+      <div className="relative z-10">{children}</div>
+
+      {/* 5. Elegant Curved Edge Transition into Ivory Sections */}
+      <div className="relative w-full overflow-hidden leading-none z-10 -mt-1 pointer-events-none">
+        <svg
+          className="relative block w-full h-10 sm:h-16 lg:h-20 text-ivory fill-current"
+          viewBox="0 0 1200 120"
+          preserveAspectRatio="none"
+        >
+          <path d="M0,0 C150,90 350,-40 500,40 C650,120 900,10 1200,60 L1200,120 L0,120 Z" />
+        </svg>
+      </div>
     </div>
   );
 }

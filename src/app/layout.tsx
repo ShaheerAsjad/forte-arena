@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { Sora, Inter } from "next/font/google";
 import { Toaster } from "sonner";
 import { APP_NAME, APP_DESCRIPTION } from "@/config/app";
+import { ScrollProgressBar } from "@/components/shared/ScrollProgressBar";
+import { BackToTop } from "@/components/shared/BackToTop";
 import "./globals.css";
 
 const sora = Sora({
@@ -37,8 +39,16 @@ export default function RootLayout({
       className={`${sora.variable} ${inter.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col font-sans bg-ivory text-ink">
+        <ScrollProgressBar />
         {children}
-        <Toaster position="top-right" richColors />
+        <BackToTop />
+        <Toaster
+          position="top-right"
+          richColors
+          toastOptions={{
+            className: "font-sans rounded-2xl border border-navy-100/80 shadow-xl",
+          }}
+        />
       </body>
     </html>
   );

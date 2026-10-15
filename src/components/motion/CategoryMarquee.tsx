@@ -27,7 +27,7 @@ export function CategoryMarquee() {
   const items = [...CATEGORIES, ...CATEGORIES];
 
   return (
-    <div className="w-full overflow-hidden border-y border-navy-100/60 bg-white/70 backdrop-blur-md py-3.5 my-8 select-none">
+    <div className="w-full overflow-hidden border-y border-white/10 bg-black/30 backdrop-blur-md py-4 select-none">
       <div className="relative max-w-6xl mx-auto px-4 overflow-hidden [mask-image:linear-gradient(to_right,transparent,black_10%,black_90%,transparent)]">
         <div
           className={`flex items-center gap-8 w-max ${
@@ -45,15 +45,15 @@ export function CategoryMarquee() {
               <Link
                 key={`${cat.id}-${idx}`}
                 href={`/events?category=${cat.id}`}
-                className="group flex items-center gap-2.5 px-3 py-1.5 rounded-full hover:bg-navy-50/80 transition-colors shrink-0"
+                className="group flex items-center gap-2.5 px-3.5 py-1.5 rounded-full hover:bg-white/10 transition-colors shrink-0"
               >
-                <span className="w-7 h-7 rounded-lg bg-navy-950 flex items-center justify-center shadow-xs group-hover:scale-110 transition-transform">
+                <span className="w-7 h-7 rounded-lg bg-navy-900 border border-white/15 flex items-center justify-center shadow-xs group-hover:scale-110 transition-transform">
                   <Icon className={`w-3.5 h-3.5 ${cat.color}`} />
                 </span>
-                <span className="text-xs sm:text-sm font-bold text-navy-900 group-hover:text-gold-600 transition-colors font-heading tracking-wide">
+                <span className="text-xs sm:text-sm font-bold text-ivory/90 group-hover:text-gold-300 transition-colors font-heading tracking-wide">
                   {cat.label}
                 </span>
-                <span className="text-navy-300 font-bold ml-4">•</span>
+                <span className="text-gold-400/50 font-bold ml-4">•</span>
               </Link>
             );
           })}

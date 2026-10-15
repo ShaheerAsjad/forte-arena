@@ -17,6 +17,7 @@ import { HowItWorksSteps } from "@/components/motion/HowItWorksSteps";
 import { CountdownChip } from "@/components/shared/CountdownChip";
 import { EventCard, CATEGORY_META } from "@/components/shared/EventCard";
 import { CategoryArtwork } from "@/components/shared/CategoryArtwork";
+import { SectionDivider } from "@/components/shared/SectionDivider";
 import { EventsService } from "@/features/events/services/events.service";
 import { AnnouncementsService } from "@/features/announcements/services/announcements.service";
 import { ResultsService } from "@/features/results/services/results.service";
@@ -46,13 +47,13 @@ export default function HomePage() {
 
       {/* 1. Hero Section with Interactive Spotlight & Mesh Gradient */}
       <HeroSpotlight>
-        <section className="relative pt-10 sm:pt-16 pb-6 px-4 sm:px-6 max-w-6xl mx-auto">
+        <section className="relative pt-10 sm:pt-16 pb-10 px-4 sm:px-6 max-w-6xl mx-auto">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
             {/* Left Hero Content */}
             <div className="lg:col-span-7 text-center lg:text-left space-y-6">
               <Reveal>
-                <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-navy-100/90 border border-gold-400/50 text-navy-950 text-xs sm:text-sm font-semibold shadow-xs">
-                  <Sparkles className="w-4 h-4 text-gold-600" />
+                <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-gold-500/15 border border-gold-400/40 text-gold-300 text-xs sm:text-sm font-semibold shadow-xs backdrop-blur-xs">
+                  <Sparkles className="w-4 h-4 text-gold-400" />
                   <span>Campus Festival 2026 Season</span>
                 </div>
               </Reveal>
@@ -60,11 +61,11 @@ export default function HomePage() {
               <HeadlineWords
                 text="Unleash Your Talent at"
                 highlightText={APP_NAME}
-                className="font-heading text-4xl sm:text-6xl font-extrabold tracking-tight text-navy-950 leading-[1.1]"
+                className="font-heading text-4xl sm:text-6xl font-extrabold tracking-tight text-ivory leading-[1.1]"
               />
 
               <Reveal delay={0.2}>
-                <p className="text-base sm:text-lg text-mist max-w-xl mx-auto lg:mx-0 leading-relaxed font-normal">
+                <p className="text-base sm:text-lg text-ivory/80 max-w-xl mx-auto lg:mx-0 leading-relaxed font-normal">
                   The university&apos;s grand stage for technical hackathons, athletic showdowns, gaming tournaments, and cultural arts. Register solo or assemble your squad.
                 </p>
               </Reveal>
@@ -77,8 +78,8 @@ export default function HomePage() {
                     </Button>
                   </Link>
                   <Link href="/results" className="w-full sm:w-auto">
-                    <Button variant="outline" size="lg" className="w-full border-navy-200 hover:bg-navy-50">
-                      <Trophy className="w-4 h-4 mr-2 text-gold-500" />
+                    <Button variant="outline" size="lg" className="w-full border-white/20 text-ivory hover:bg-white/10 hover:border-white/40">
+                      <Trophy className="w-4 h-4 mr-2 text-gold-400" />
                       <span>View Winners</span>
                     </Button>
                   </Link>
@@ -94,10 +95,10 @@ export default function HomePage() {
             </div>
           </div>
         </section>
-      </HeroSpotlight>
 
-      {/* 2. Slow Infinite Marquee Strip */}
-      <CategoryMarquee />
+        {/* 2. Slow Infinite Marquee Strip inside dark hero */}
+        <CategoryMarquee />
+      </HeroSpotlight>
 
       {/* 3. Stats Strip (Animated On Viewport Scroll) */}
       <section className="max-w-6xl mx-auto px-4 sm:px-6">
@@ -132,6 +133,8 @@ export default function HomePage() {
           <FeaturedEventsGrid />
         </Suspense>
       </section>
+
+      <SectionDivider />
 
       {/* 5. Category Tiles with Code-Made Illustrated Artwork */}
       <section className="max-w-6xl mx-auto px-4 sm:px-6 space-y-8">
@@ -307,8 +310,9 @@ async function HeroNextEventCard() {
 
   return (
     <TiltCard className="w-full max-w-md">
-      <Card className="w-full p-6 sm:p-7 space-y-6 bg-gradient-to-br from-navy-950 via-navy-900 to-navy-950 text-ivory border-navy-800 shadow-2xl rounded-3xl relative overflow-hidden group">
-        <div className="absolute top-0 right-0 w-36 h-36 bg-gold-400/15 rounded-full blur-2xl" />
+      <Card className="w-full p-6 sm:p-7 space-y-6 bg-navy-950/75 backdrop-blur-xl text-ivory border border-white/20 shadow-2xl rounded-3xl relative overflow-hidden group">
+        <div className="absolute top-0 right-0 w-44 h-44 bg-gold-400/20 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute bottom-0 left-0 w-36 h-36 bg-blue-500/15 rounded-full blur-2xl pointer-events-none" />
 
         <div className="flex items-center justify-between">
           <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-gold-500/20 text-gold-400 border border-gold-400/30">
