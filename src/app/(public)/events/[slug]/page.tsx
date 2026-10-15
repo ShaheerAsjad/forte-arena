@@ -26,20 +26,7 @@ interface EventDetailPageProps {
   params: Promise<{ slug: string }>;
 }
 
-export default async function EventDetailPage({ params }: EventDetailPageProps) {
-  const { slug } = await params;
-  const event = await EventsService.getEventDetails(slug);
-
-  if (!event) {
-    notFound();
-  }
-
-  const { item, derivedStatus } = event;
-  const categoryMeta = CATEGORY_META[item.category] || CATEGORY_META.OTHER;
-  const CategoryIcon = categoryMeta.icon;
-
-  const relatedEvents = await EventsService.getRelatedEvents(item.category, item.slug, 3);
-
+export default function EventDetailPage({ params }: EventDetailPageProps) {
   return (
     <div className="relative space-y-12 pb-20 overflow-hidden">
       {/* Ambient Navy/Gold Mesh Backdrop */}
@@ -62,6 +49,29 @@ export default async function EventDetailPage({ params }: EventDetailPageProps) 
         </Link>
       </div>
 
+      <Suspense fallback={<EventDetailSkeleton />}>
+        <EventDetailContent params={params} />
+      </Suspense>
+    </div>
+  );
+}
+
+async function EventDetailContent({ params }: EventDetailPageProps) {
+  const { slug } = await params;
+  const event = await EventsService.getEventDetails(slug);
+
+  if (!event) {
+    notFound();
+  }
+
+  const { item, derivedStatus } = event;
+  const categoryMeta = CATEGORY_META[item.category] || CATEGORY_META.OTHER;
+  const CategoryIcon = categoryMeta.icon;
+
+  const relatedEvents = await EventsService.getRelatedEvents(item.category, item.slug, 3);
+
+  return (
+    <>
       {/* Hero Poster Banner */}
       <section className="max-w-6xl mx-auto px-4 sm:px-6">
         <div className="relative rounded-3xl overflow-hidden bg-gradient-to-br from-navy-950 via-navy-900 to-navy-950 text-ivory border border-navy-800 shadow-xl">
@@ -203,6 +213,22 @@ export default async function EventDetailPage({ params }: EventDetailPageProps) 
           </div>
         </section>
       )}
+    </>
+  );
+}
+
+function EventDetailSkeleton() {
+  return (
+    <div className="space-y-12 max-w-6xl mx-auto px-4 sm:px-6">
+      <Card className="h-64 sm:h-96 bg-navy-900 rounded-3xl animate-pulse border-navy-800" />
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+        <div className="lg:col-span-8">
+          <Card className="h-80 bg-white rounded-2xl border border-navy-100 animate-pulse" />
+        </div>
+        <div className="lg:col-span-4">
+          <Card className="p-7 space-y-4 bg-white rounded-2xl border border-navy-100 animate-pulse h-72" />
+        </div>
+      </div>
     </div>
   );
 }

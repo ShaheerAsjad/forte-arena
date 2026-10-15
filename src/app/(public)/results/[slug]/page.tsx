@@ -13,9 +13,7 @@ interface EventResultsPageProps {
   params: Promise<{ slug: string }>;
 }
 
-export default async function EventResultsPage({ params }: EventResultsPageProps) {
-  const { slug } = await params;
-
+export default function EventResultsPage({ params }: EventResultsPageProps) {
   return (
     <div className="relative space-y-10 pb-20 max-w-6xl mx-auto px-4 sm:px-6 pt-4 overflow-hidden">
       {/* Ambient Navy/Gold Mesh Backdrop */}
@@ -39,13 +37,14 @@ export default async function EventResultsPage({ params }: EventResultsPageProps
       </div>
 
       <Suspense fallback={<ResultsDetailSkeleton />}>
-        <EventResultsLoader slug={slug} />
+        <EventResultsLoader params={params} />
       </Suspense>
     </div>
   );
 }
 
-async function EventResultsLoader({ slug }: { slug: string }) {
+async function EventResultsLoader({ params }: EventResultsPageProps) {
+  const { slug } = await params;
   const event = await ResultsService.getEventResults(slug);
 
   if (!event) {

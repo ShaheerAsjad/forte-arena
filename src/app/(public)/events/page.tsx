@@ -21,9 +21,7 @@ interface EventsPageProps {
   }>;
 }
 
-export default async function EventsPage({ searchParams }: EventsPageProps) {
-  const params = await searchParams;
-
+export default function EventsPage({ searchParams }: EventsPageProps) {
   return (
     <PageShell
       badge="Festival Schedule"
@@ -37,11 +35,8 @@ export default async function EventsPage({ searchParams }: EventsPageProps) {
         </Suspense>
 
         {/* Suspenseful Events Grid */}
-        <Suspense
-          key={JSON.stringify(params)}
-          fallback={<EventsListSkeleton />}
-        >
-          <EventsGridLoader params={params} />
+        <Suspense fallback={<EventsListSkeleton />}>
+          <EventsGridLoader searchParams={searchParams} />
         </Suspense>
       </div>
     </PageShell>
@@ -53,10 +48,11 @@ export default async function EventsPage({ searchParams }: EventsPageProps) {
 // -------------------------------------------------------------
 
 async function EventsGridLoader({
-  params,
+  searchParams,
 }: {
-  params: { q?: string; category?: string; status?: string; page?: string };
+  searchParams: EventsPageProps["searchParams"];
 }) {
+  const params = await searchParams;
   const page = params.page ? parseInt(params.page, 10) : 1;
   const category =
     params.category && params.category !== "ALL"

@@ -14,38 +14,49 @@ interface RegisterPageProps {
   params: Promise<{ slug: string }>;
 }
 
-export default async function RegisterPage({ params }: RegisterPageProps) {
-  const { slug } = await params;
-
+export default function RegisterPage({ params }: RegisterPageProps) {
   return (
     <div className="min-h-screen px-4 py-10 sm:px-8 bg-navy-50/40">
       <div className="max-w-lg mx-auto">
-        <Link
-          href={`/events/${slug}`}
-          className="inline-flex items-center gap-1.5 text-sm font-semibold text-mist hover:text-navy-950 transition mb-6"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          Back to Event
-        </Link>
-
-        <Card className="p-6 sm:p-8 bg-white border border-navy-100 shadow-sm">
-          <Suspense
-            fallback={
-              <div className="space-y-4 animate-pulse">
+        <Suspense
+          fallback={
+            <div>
+              <div className="h-5 w-28 bg-navy-100 rounded mb-6 animate-pulse" />
+              <Card className="p-6 sm:p-8 bg-white border border-navy-100 shadow-sm space-y-4 animate-pulse">
                 <div className="h-4 bg-navy-100 rounded w-3/4" />
                 <div className="h-40 bg-navy-50 rounded-xl" />
-              </div>
-            }
-          >
-            <RegisterContent slug={slug} />
-          </Suspense>
-        </Card>
+              </Card>
+            </div>
+          }
+        >
+          <RegisterContent params={params} />
+        </Suspense>
       </div>
     </div>
   );
 }
 
-async function RegisterContent({ slug }: { slug: string }) {
+async function RegisterContent({ params }: RegisterPageProps) {
+  const { slug } = await params;
+
+  return (
+    <div>
+      <Link
+        href={`/events/${slug}`}
+        className="inline-flex items-center gap-1.5 text-sm font-semibold text-mist hover:text-navy-950 transition mb-6"
+      >
+        <ArrowLeft className="w-4 h-4" />
+        Back to Event
+      </Link>
+
+      <Card className="p-6 sm:p-8 bg-white border border-navy-100 shadow-sm">
+        <RegisterInnerContent slug={slug} />
+      </Card>
+    </div>
+  );
+}
+
+async function RegisterInnerContent({ slug }: { slug: string }) {
   const user = await requireUser(`/login?next=/events/${slug}/register`);
 
   const event = await EventsRepository.getEventBySlug(slug);
