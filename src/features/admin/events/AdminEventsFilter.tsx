@@ -2,7 +2,17 @@
 
 import { useTransition } from "react";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
-import { Search, Filter } from "lucide-react";
+import { Search } from "lucide-react";
+import { Select } from "@/components/ui/Select";
+
+const STATUS_OPTIONS = [
+  { value: "ALL", label: "All Statuses" },
+  { value: "DRAFT", label: "Draft" },
+  { value: "PUBLISHED", label: "Published" },
+  { value: "CLOSED", label: "Closed" },
+  { value: "COMPLETED", label: "Completed" },
+  { value: "CANCELLED", label: "Cancelled" },
+];
 
 export function AdminEventsFilter({
   currentSearch,
@@ -55,22 +65,19 @@ export function AdminEventsFilter({
       </div>
 
       {/* Status Filter */}
-      <div className="flex items-center gap-2 w-full sm:w-auto self-end">
-        <Filter className="w-3.5 h-3.5 text-mist" />
-        <select
-          defaultValue={currentStatus || "ALL"}
-          onChange={(e) => updateFilters(undefined, e.target.value)}
-          className="px-3 py-2 text-xs font-semibold rounded-xl border border-navy-200 bg-white text-navy-950 focus:outline-none focus:ring-2 focus:ring-gold-400 cursor-pointer"
-        >
-          <option value="ALL">All Statuses</option>
-          <option value="DRAFT">Draft</option>
-          <option value="PUBLISHED">Published</option>
-          <option value="CLOSED">Closed</option>
-          <option value="COMPLETED">Completed</option>
-          <option value="CANCELLED">Cancelled</option>
-        </select>
+      <div className="flex items-center gap-2 w-full sm:w-52">
+        <div className="flex-1">
+          <Select
+            value={currentStatus || "ALL"}
+            onChange={(val) => updateFilters(undefined, val)}
+            options={STATUS_OPTIONS}
+            size="sm"
+          />
+        </div>
         {isPending && (
-          <span className="text-[11px] text-mist animate-pulse">Filtering...</span>
+          <span className="text-[11px] text-mist animate-pulse shrink-0">
+            Filtering...
+          </span>
         )}
       </div>
     </div>

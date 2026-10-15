@@ -72,6 +72,47 @@ export function getDerivedStatus(event: {
 }
 
 /**
+ * Compute the effective status of an event from dates and stored state without relying on background cron.
+ * Used for admin event badges, filtering, and lifecycle resolution.
+ */
+export function getEffectiveStatus(event: {
+  status: EventStatus;
+  startsAt: Date | string;
+  endsAt?: Date | string | null;
+  registrationDeadline: Date | string;
+  resultsPublished?: boolean;
+}): EventStatus {
+  const now = Date.now();
+  const { status, startsAt, endsAt, registrationDeadline, resultsPublished } = event;
+
+  // DRAFT and CANCELLED are explicit organizer states
+  if (status === "DRAFT" || status === "CANCELLED") {
+    return status;
+  }
+
+  // Explicitly marked as COMPLETED or results have been published
+  if (status === "COMPLETED" || resultsPublished) {
+    return "COMPLETED";
+  }
+
+  // If endsAt timestamp is defined and has passed
+  if (endsAt && now >= new Date(endsAt).getTime()) {
+    return "COMPLETED";
+  }
+
+  // If manually CLOSED, or event has started, or registration deadline has passed
+  const deadline = new Date(registrationDeadline).getTime();
+  const start = new Date(startsAt).getTime();
+
+  if (status === "CLOSED" || now >= start || now > deadline) {
+    return "CLOSED";
+  }
+
+  // Still active and open for registration
+  return "PUBLISHED";
+}
+
+/**
  * Calculate seats left
  */
 export function getRemainingSeats(event: {

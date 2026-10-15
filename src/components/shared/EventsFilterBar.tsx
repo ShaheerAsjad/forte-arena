@@ -75,7 +75,7 @@ export function EventsFilterBar() {
           <Select
             options={STATUS_OPTIONS}
             value={currentStatus}
-            onChange={(e) => updateParam("status", e.target.value)}
+            onChange={(val) => updateParam("status", val)}
           />
         </div>
 

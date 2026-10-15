@@ -4,18 +4,13 @@ import Image from "next/image";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { AdminEventsFilter } from "@/features/admin/events/AdminEventsFilter";
+import { AdminEventRowActions } from "@/features/admin/events/AdminEventRowActions";
 import { StatusBadge } from "@/components/shared/StatusBadge";
-import { EventsService } from "@/features/events/services/events.service";
+import { getEffectiveStatus } from "@/features/events/events.derived";
 import { CategoryArtwork } from "@/components/shared/CategoryArtwork";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
-import {
-  Plus,
-  Users,
-  Calendar,
-  ExternalLink,
-  Edit,
-} from "lucide-react";
+import { Plus, Users, Calendar } from "lucide-react";
 import type { EventStatus } from "@/lib/db-types";
 
 export const metadata = {
@@ -50,10 +45,6 @@ async function AdminEventsContent({
 
   const where: NonNullable<Parameters<typeof prisma.event.findMany>[0]>["where"] = {};
 
-  if (status && status !== "ALL" && VALID_STATUSES.includes(status as EventStatus)) {
-    where.status = status as EventStatus;
-  }
-
   if (search && search.trim()) {
     const q = search.trim();
     where.OR = [
@@ -64,7 +55,7 @@ async function AdminEventsContent({
     ];
   }
 
-  const events = await prisma.event.findMany({
+  const rawEvents = await prisma.event.findMany({
     where,
     orderBy: { startsAt: "desc" },
     include: {
@@ -75,6 +66,18 @@ async function AdminEventsContent({
       },
     },
   });
+
+  // Calculate effective status from dates and stored lifecycle state
+  const eventsWithEffective = rawEvents.map((ev) => ({
+    ...ev,
+    effectiveStatus: getEffectiveStatus(ev),
+  }));
+
+  // Filter by effective status if status filter is active
+  const events =
+    status && status !== "ALL" && VALID_STATUSES.includes(status as EventStatus)
+      ? eventsWithEffective.filter((ev) => ev.effectiveStatus === status)
+      : eventsWithEffective;
 
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
@@ -131,8 +134,6 @@ async function AdminEventsContent({
               </thead>
               <tbody className="divide-y divide-navy-50">
                 {events.map((event) => {
-                  const derivedStatus = EventsService.getDerivedStatus(event);
-
                   return (
                     <tr
                       key={event.id}
@@ -174,7 +175,7 @@ async function AdminEventsContent({
 
                       {/* Status */}
                       <td className="py-3 px-3">
-                        <StatusBadge status={derivedStatus} />
+                        <StatusBadge status={event.effectiveStatus} />
                       </td>
 
                       {/* Participation format */}
@@ -186,7 +187,7 @@ async function AdminEventsContent({
                         </span>
                       </td>
 
-                      {/* Dates */}
+                      {/* Schedule */}
                       <td className="py-3 px-3 text-mist whitespace-nowrap">
                         <div className="font-medium text-navy-900">
                           {new Date(event.startsAt).toLocaleDateString("en-US", {
@@ -220,35 +221,10 @@ async function AdminEventsContent({
 
                       {/* Actions */}
                       <td className="py-3 px-3 text-right whitespace-nowrap">
-                        <div className="flex items-center justify-end gap-1.5">
-                          <Link
-                            href={`/admin/events/${event.id}/registrations`}
-                            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-navy-50 hover:bg-navy-100 text-navy-900 transition"
-                            title="Manage registrations"
-                          >
-                            <Users className="w-3.5 h-3.5 text-gold-600" />
-                            <span>Registrations</span>
-                          </Link>
-
-                          <Link
-                            href={`/admin/events/${event.id}/edit`}
-                            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold border border-navy-200 hover:bg-navy-50 text-navy-900 transition"
-                            title="Edit event"
-                          >
-                            <Edit className="w-3.5 h-3.5 text-mist" />
-                            <span>Edit</span>
-                          </Link>
-
-                          <Link
-                            href={`/events/${event.slug}`}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="p-1.5 rounded-lg text-mist hover:text-navy-900 hover:bg-navy-50 transition"
-                            title="View public page"
-                          >
-                            <ExternalLink className="w-3.5 h-3.5" />
-                          </Link>
-                        </div>
+                        <AdminEventRowActions
+                          event={event}
+                          effectiveStatus={event.effectiveStatus}
+                        />
                       </td>
                     </tr>
                   );

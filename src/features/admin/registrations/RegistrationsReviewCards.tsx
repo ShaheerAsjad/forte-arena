@@ -8,6 +8,7 @@ import {
 } from "@/features/admin/registrations.actions";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
+import { Select } from "@/components/ui/Select";
 import { toast } from "sonner";
 import {
   CheckCircle2,
@@ -24,7 +25,6 @@ import {
   Check,
   ChevronDown,
   ChevronUp,
-  Filter,
   Calendar,
 } from "lucide-react";
 
@@ -311,20 +311,22 @@ export function RegistrationsReviewCards({
 
           {/* Event Filter (when cross-event hub is active) */}
           {showEventFilter && events && events.length > 0 && (
-            <div className="flex items-center gap-2 shrink-0">
-              <Filter className="w-4 h-4 text-mist shrink-0 hidden sm:block" />
-              <select
+            <div className="w-full sm:w-64 shrink-0">
+              <Select
                 value={selectedEventId}
-                onChange={(e) => setSelectedEventId(e.target.value)}
-                className="w-full sm:w-auto px-3 py-2 text-xs sm:text-sm rounded-xl border border-navy-200 bg-white font-medium text-navy-950 focus:outline-none focus:ring-2 focus:ring-gold-400"
-              >
-                <option value="ALL">All Competitions ({registrations.length})</option>
-                {events.map((ev) => (
-                  <option key={ev.id} value={ev.id}>
-                    {ev.title}
-                  </option>
-                ))}
-              </select>
+                onChange={(val) => setSelectedEventId(val || "ALL")}
+                options={[
+                  {
+                    value: "ALL",
+                    label: `All Competitions (${registrations.length})`,
+                  },
+                  ...events.map((ev) => ({
+                    value: ev.id,
+                    label: ev.title,
+                  })),
+                ]}
+                size="sm"
+              />
             </div>
           )}
         </div>

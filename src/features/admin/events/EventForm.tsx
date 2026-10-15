@@ -20,6 +20,7 @@ import { decorateEvent, type EventCardItem } from "@/features/events/events.deri
 import { EventCard } from "@/components/shared/EventCard";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
+import { Select } from "@/components/ui/Select";
 import { toast } from "sonner";
 import {
   Upload,
@@ -333,42 +334,46 @@ export function EventForm({ initialData, isEdit = false }: EventFormProps) {
             {/* Category & Status */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs font-bold text-navy-900 mb-1">
-                  Category <span className="text-danger">*</span>
-                </label>
-                <select
-                  {...register("category")}
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-navy-200 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-gold-400"
-                >
-                  <option value="TECHNICAL">Technical</option>
-                  <option value="SPORTS">Sports</option>
-                  <option value="CULTURAL">Cultural</option>
-                  <option value="ACADEMIC">Academic</option>
-                  <option value="GAMING">Gaming</option>
-                  <option value="OTHER">Other</option>
-                </select>
-                {errors.category && (
-                  <p className="text-xs text-danger mt-1">{errors.category.message}</p>
-                )}
+                <Select
+                  label="Category"
+                  required
+                  value={watch("category")}
+                  onChange={(val) =>
+                    setValue("category", val as EventFormValues["category"], {
+                      shouldValidate: true,
+                    })
+                  }
+                  options={[
+                    { value: "TECHNICAL", label: "Technical" },
+                    { value: "SPORTS", label: "Sports" },
+                    { value: "CULTURAL", label: "Cultural" },
+                    { value: "ACADEMIC", label: "Academic" },
+                    { value: "GAMING", label: "Gaming" },
+                    { value: "OTHER", label: "Other" },
+                  ]}
+                  error={errors.category?.message}
+                />
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-navy-900 mb-1">
-                  Status <span className="text-danger">*</span>
-                </label>
-                <select
-                  {...register("status")}
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-navy-200 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-gold-400 font-semibold"
-                >
-                  <option value="DRAFT">DRAFT (Hidden)</option>
-                  <option value="PUBLISHED">PUBLISHED (Open for registration)</option>
-                  <option value="CLOSED">CLOSED (Registrations stopped)</option>
-                  <option value="COMPLETED">COMPLETED (Event ended)</option>
-                  <option value="CANCELLED">CANCELLED (Archived)</option>
-                </select>
-                {errors.status && (
-                  <p className="text-xs text-danger mt-1">{errors.status.message}</p>
-                )}
+                <Select
+                  label="Status"
+                  required
+                  value={watch("status")}
+                  onChange={(val) =>
+                    setValue("status", val as EventFormValues["status"], {
+                      shouldValidate: true,
+                    })
+                  }
+                  options={[
+                    { value: "DRAFT", label: "DRAFT (Hidden)" },
+                    { value: "PUBLISHED", label: "PUBLISHED (Open for registration)" },
+                    { value: "CLOSED", label: "CLOSED (Registrations stopped)" },
+                    { value: "COMPLETED", label: "COMPLETED (Event ended)" },
+                    { value: "CANCELLED", label: "CANCELLED (Archived)" },
+                  ]}
+                  error={errors.status?.message}
+                />
               </div>
             </div>
 
@@ -539,21 +544,23 @@ export function EventForm({ initialData, isEdit = false }: EventFormProps) {
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs font-bold text-navy-900 mb-1">
-                  Participation Format <span className="text-danger">*</span>
-                </label>
-                <select
-                  {...register("participationType")}
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-navy-200 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-gold-400"
-                >
-                  <option value="INDIVIDUAL">Solo / Individual</option>
-                  <option value="TEAM">Team</option>
-                </select>
-                {errors.participationType && (
-                  <p className="text-xs text-danger mt-1">
-                    {errors.participationType.message}
-                  </p>
-                )}
+                <Select
+                  label="Participation Format"
+                  required
+                  value={watch("participationType")}
+                  onChange={(val) =>
+                    setValue(
+                      "participationType",
+                      val as EventFormValues["participationType"],
+                      { shouldValidate: true }
+                    )
+                  }
+                  options={[
+                    { value: "INDIVIDUAL", label: "Solo / Individual" },
+                    { value: "TEAM", label: "Team" },
+                  ]}
+                  error={errors.participationType?.message}
+                />
               </div>
 
               <div>

@@ -232,3 +232,34 @@ export async function cancelEventAction(
     return { ok: false, error: message };
   }
 }
+
+/**
+ * Server action to mark an event as COMPLETED.
+ */
+export async function markEventCompletedAction(
+  eventId: string
+): Promise<ActionResult<{ success: boolean }>> {
+  try {
+    await requireRole(["ORGANIZER", "ADMIN"]);
+
+    const event = await prisma.event.update({
+      where: { id: eventId },
+      data: { status: "COMPLETED" },
+      select: { id: true, slug: true },
+    });
+
+    revalidatePath("/admin/events");
+    revalidatePath(`/admin/events/${eventId}/edit`);
+    revalidatePath(`/events/${event.slug}`);
+    revalidatePath("/events");
+    revalidatePath("/admin");
+    revalidatePath("/results");
+    revalidatePath("/");
+
+    return { ok: true, data: { success: true } };
+  } catch (err) {
+    const message =
+      err instanceof Error ? err.message : "Failed to mark event as completed.";
+    return { ok: false, error: message };
+  }
+}
