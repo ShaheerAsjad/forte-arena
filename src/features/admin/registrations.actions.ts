@@ -5,10 +5,11 @@ import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { AppError } from "@/lib/errors";
 import type { ActionResult } from "@/lib/action-result";
+import { AdminRepository } from "./admin.repository";
 
 /**
  * Server action to approve a participant registration.
- * Re-checks event participant capacity inside a database transaction to prevent over-subscription.
+ * Re-checks event participant capacity inside a database transaction with PostgreSQL row-level lock (FOR UPDATE).
  */
 export async function approveRegistrationAction(
   registrationId: string
@@ -16,64 +17,10 @@ export async function approveRegistrationAction(
   try {
     const user = await requireRole(["ORGANIZER", "ADMIN"]);
 
-    const updated = await prisma.$transaction(async (tx) => {
-      const reg = await tx.registration.findUnique({
-        where: { id: registrationId },
-        include: {
-          event: {
-            select: {
-              id: true,
-              slug: true,
-              maxParticipants: true,
-            },
-          },
-        },
-      });
-
-      if (!reg) {
-        throw new AppError("Registration not found.", "NOT_FOUND", 404);
-      }
-
-      // If already approved, return without error
-      if (reg.status === "APPROVED") {
-        return reg;
-      }
-
-      // Re-check capacity inside transaction
-      if (reg.event.maxParticipants !== null) {
-        const currentApproved = await tx.registration.count({
-          where: {
-            eventId: reg.eventId,
-            status: "APPROVED",
-          },
-        });
-
-        if (currentApproved >= reg.event.maxParticipants) {
-          throw new AppError(
-            `Event capacity reached (${reg.event.maxParticipants} max participants). Cannot approve additional registrations.`,
-            "EVENT_FULL",
-            400
-          );
-        }
-      }
-
-      return tx.registration.update({
-        where: { id: registrationId },
-        data: {
-          status: "APPROVED",
-          reviewedById: user.id,
-          reviewedAt: new Date(),
-        },
-        include: {
-          event: {
-            select: {
-              id: true,
-              slug: true,
-            },
-          },
-        },
-      });
-    });
+    const updated = await AdminRepository.approveRegistrationWithLock(
+      registrationId,
+      user.id
+    );
 
     revalidatePath(`/admin/events/${updated.event.id}/registrations`);
     revalidatePath(`/events/${updated.event.slug}`);

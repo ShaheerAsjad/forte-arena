@@ -4,6 +4,7 @@ import "server-only";
 import { createClient } from "@supabase/supabase-js";
 import { requireRole } from "@/lib/session";
 import type { ActionResult } from "@/lib/action-result";
+import { isPlaceholderSecretKey } from "./admin.utils";
 
 const ALLOWED_MIME_TYPES = ["image/png", "image/jpeg", "image/webp"];
 const MAX_FILE_SIZE_BYTES = 2 * 1024 * 1024; // 2 MB
@@ -23,18 +24,11 @@ export async function uploadPosterAction(
     const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
 
-    const isKeyPlaceholder =
-      !serviceRoleKey ||
-      serviceRoleKey.trim() === "" ||
-      serviceRoleKey.toLowerCase().includes("placeholder") ||
-      serviceRoleKey.toLowerCase().includes("your-") ||
-      !serviceRoleKey.startsWith("ey");
-
-    if (isKeyPlaceholder) {
+    if (isPlaceholderSecretKey(serviceRoleKey)) {
       return {
         ok: false,
         error:
-          "Supabase service role key is not configured or is a placeholder. Please configure a valid SUPABASE_SERVICE_ROLE_KEY in .env.",
+          "SUPABASE_SERVICE_ROLE_KEY is not configured or is a placeholder. Please configure a valid secret key for SUPABASE_SERVICE_ROLE_KEY in .env or .env.local.",
       };
     }
 
@@ -42,7 +36,7 @@ export async function uploadPosterAction(
       return {
         ok: false,
         error:
-          "NEXT_PUBLIC_SUPABASE_URL is not configured. Please configure it in .env.",
+          "NEXT_PUBLIC_SUPABASE_URL is not configured or invalid. Please configure NEXT_PUBLIC_SUPABASE_URL in .env or .env.local.",
       };
     }
 

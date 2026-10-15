@@ -105,3 +105,19 @@ export function buildCsv(
   const rowLines = rows.map((row) => row.map(escapeCsvCell).join(","));
   return [headerLine, ...rowLines].join("\r\n");
 }
+
+/**
+ * Validate whether a secret key is missing or a placeholder.
+ * Rejects: empty, containing "placeholder" or "PASTE_SECRET_KEY_HERE".
+ * Accepts: "sb_secret_..." keys, legacy "eyJ..." JWT keys, or any non-placeholder secret.
+ */
+export function isPlaceholderSecretKey(key: string | undefined | null): boolean {
+  if (!key) return true;
+  const trimmed = key.trim();
+  if (trimmed.length === 0) return true;
+  const lower = trimmed.toLowerCase();
+  if (lower.includes("placeholder")) return true;
+  if (lower.includes("paste_secret_key_here")) return true;
+  return false;
+}
+

@@ -487,6 +487,18 @@ async function main() {
     });
   }
 
+  // Ensure any legacy fake certificate URLs are completely set to null
+  await prisma.result.updateMany({
+    where: {
+      certificateUrl: {
+        contains: "certificates.forte-arena.edu",
+      },
+    },
+    data: {
+      certificateUrl: null,
+    },
+  });
+
   // 6. Announcements (3 certificate-related bulletins)
   const certificateAnnouncements = [
     {

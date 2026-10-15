@@ -1,6 +1,7 @@
 import { connection } from "next/server";
 import { prisma } from "@/lib/prisma";
 import type { RegistrationStatus } from "@/lib/db-types";
+import { AppError } from "@/lib/errors";
 
 export interface AdminStats {
   totalEvents: number;
@@ -114,4 +115,77 @@ export class AdminRepository {
 
     return rows as unknown as AdminRecentRegistration[];
   }
+
+  /**
+   * Approves a participant registration safely inside a database transaction.
+   * Employs row-level locking (SELECT ... FOR UPDATE on "events") to serialize
+   * concurrent approval attempts and prevent oversubscribing capacity.
+   */
+  static async approveRegistrationWithLock(
+    registrationId: string,
+    reviewerId: string
+  ): Promise<{ id: string; event: { id: string; slug: string } }> {
+    return prisma.$transaction(async (tx) => {
+      const reg = await tx.registration.findUnique({
+        where: { id: registrationId },
+        include: {
+          event: {
+            select: {
+              id: true,
+              slug: true,
+              maxParticipants: true,
+            },
+          },
+        },
+      });
+
+      if (!reg) {
+        throw new AppError("Registration not found.", "NOT_FOUND", 404);
+      }
+
+      // If already approved, return without error
+      if (reg.status === "APPROVED") {
+        return reg;
+      }
+
+      // Lock the event row in PostgreSQL to serialize concurrent approvals for this event
+      await tx.$queryRaw`SELECT id FROM "events" WHERE id = ${reg.eventId} FOR UPDATE`;
+
+      // Re-check capacity inside transaction while event lock is held
+      if (reg.event.maxParticipants !== null) {
+        const currentApproved = await tx.registration.count({
+          where: {
+            eventId: reg.eventId,
+            status: "APPROVED",
+          },
+        });
+
+        if (currentApproved >= reg.event.maxParticipants) {
+          throw new AppError(
+            `Event capacity reached (${reg.event.maxParticipants} max participants). Cannot approve additional registrations.`,
+            "EVENT_FULL",
+            400
+          );
+        }
+      }
+
+      return tx.registration.update({
+        where: { id: registrationId },
+        data: {
+          status: "APPROVED",
+          reviewedById: reviewerId,
+          reviewedAt: new Date(),
+        },
+        include: {
+          event: {
+            select: {
+              id: true,
+              slug: true,
+            },
+          },
+        },
+      });
+    });
+  }
 }
+
