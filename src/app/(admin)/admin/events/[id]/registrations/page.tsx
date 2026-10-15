@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
-import { RegistrationsReviewTable } from "@/features/admin/registrations/RegistrationsReviewTable";
+import { RegistrationsReviewCards, type RegistrationReviewItem } from "@/features/admin/registrations/RegistrationsReviewCards";
 import { Button } from "@/components/ui/Button";
 import {
   ArrowLeft,
@@ -81,6 +81,18 @@ async function RegistrationsContent({
 
   const approvedCount = registrations.filter((r) => r.status === "APPROVED").length;
   const pendingCount = registrations.filter((r) => r.status === "PENDING").length;
+
+  const registrationsWithEvent = registrations.map((r) => ({
+    ...r,
+    event: {
+      id: event.id,
+      title: event.title,
+      slug: event.slug,
+      category: event.category,
+      participationType: event.participationType,
+      maxParticipants: event.maxParticipants,
+    },
+  }));
 
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
@@ -181,10 +193,10 @@ async function RegistrationsContent({
         </div>
       </div>
 
-      {/* Review Table Component */}
-      <RegistrationsReviewTable
-        registrations={registrations as unknown as Parameters<typeof RegistrationsReviewTable>[0]["registrations"]}
-        eventId={event.id}
+      {/* Review Cards Component */}
+      <RegistrationsReviewCards
+        registrations={registrationsWithEvent as unknown as RegistrationReviewItem[]}
+        currentEventId={event.id}
         maxParticipants={event.maxParticipants}
         approvedCount={approvedCount}
       />

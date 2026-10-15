@@ -23,6 +23,7 @@ export async function approveRegistrationAction(
     );
 
     revalidatePath(`/admin/events/${updated.event.id}/registrations`);
+    revalidatePath("/admin/registrations");
     revalidatePath(`/events/${updated.event.slug}`);
     revalidatePath("/admin");
     revalidatePath("/dashboard");
@@ -86,6 +87,7 @@ export async function rejectRegistrationAction(
     });
 
     revalidatePath(`/admin/events/${reg.event.id}/registrations`);
+    revalidatePath("/admin/registrations");
     revalidatePath(`/events/${reg.event.slug}`);
     revalidatePath("/admin");
     revalidatePath("/dashboard");
