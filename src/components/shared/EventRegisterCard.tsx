@@ -2,6 +2,8 @@ import Link from "next/link";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { CountdownChip } from "@/components/shared/CountdownChip";
+import { FlipCountdown } from "@/components/shared/FlipCountdown";
+import { EventShareActions } from "@/features/events/components/EventShareActions";
 import { formatDeadline } from "@/lib/dates";
 import {
   Clock,
@@ -60,7 +62,7 @@ export function EventRegisterCard({
       REGISTRATION_STATUS_STYLES.PENDING;
 
     return (
-      <Card className="sticky top-24 p-6 sm:p-7 space-y-5 border border-navy-100 shadow-xl bg-white/95 backdrop-blur-md">
+      <Card id="event-register-card" className="sticky top-24 p-6 sm:p-7 space-y-5 border border-navy-100 shadow-xl bg-white/95 backdrop-blur-md">
         <div className="flex items-center gap-2">
           <CheckCircle2 className="w-5 h-5 text-success" />
           <p className="font-bold text-navy-950">Already Registered</p>
@@ -88,7 +90,7 @@ export function EventRegisterCard({
   // Withdrawn 2 or more times (attempt limit reached)
   if (limitReached) {
     return (
-      <Card className="sticky top-24 p-6 sm:p-7 space-y-5 border border-navy-100 shadow-xl bg-white/95 backdrop-blur-md">
+      <Card id="event-register-card" className="sticky top-24 p-6 sm:p-7 space-y-5 border border-navy-100 shadow-xl bg-white/95 backdrop-blur-md">
         <div className="flex items-center gap-2">
           <AlertCircle className="w-5 h-5 text-mist" />
           <p className="font-bold text-navy-950">Registration Limit Reached</p>
@@ -107,7 +109,7 @@ export function EventRegisterCard({
   }
 
   return (
-    <Card className="sticky top-24 p-6 sm:p-7 space-y-6 border border-navy-100 shadow-xl bg-white/95 backdrop-blur-md">
+    <Card id="event-register-card" className="sticky top-24 p-6 sm:p-7 space-y-6 border border-navy-100 shadow-xl bg-white/95 backdrop-blur-md">
       {/* Header status & countdown */}
       <div className="space-y-3 pb-5 border-b border-navy-100">
         <span className="text-xs font-bold uppercase tracking-wider text-mist">
@@ -119,9 +121,12 @@ export function EventRegisterCard({
         </div>
 
         {isRegistrationOpen ? (
-          <div className="pt-1 flex items-center gap-2">
-            <Clock className="w-4 h-4 text-warning" />
-            <CountdownChip targetDate={item.registrationDeadline} />
+          <div className="pt-3">
+            <FlipCountdown
+              targetDate={item.registrationDeadline}
+              compact
+              label="Closes In"
+            />
           </div>
         ) : (
           <p className="text-xs font-semibold text-danger">
@@ -215,6 +220,10 @@ export function EventRegisterCard({
         <p className="text-center text-[11px] text-mist">
           Instant submission • Fast organiser review
         </p>
+
+        <div className="pt-3 border-t border-navy-100 flex justify-center">
+          <EventShareActions event={item} />
+        </div>
       </div>
     </Card>
   );

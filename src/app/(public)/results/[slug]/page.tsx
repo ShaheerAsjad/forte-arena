@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { Badge } from "@/components/ui/Badge";
@@ -11,6 +12,40 @@ import { ArrowLeft, Trophy, Calendar, MapPin } from "lucide-react";
 
 interface EventResultsPageProps {
   params: Promise<{ slug: string }>;
+}
+
+export async function generateMetadata({
+  params,
+}: EventResultsPageProps): Promise<Metadata> {
+  const { slug } = await params;
+  const event = await ResultsService.getEventResults(slug);
+  if (!event) {
+    return {
+      title: "Results Not Found | Forte Arena",
+    };
+  }
+
+  const title = `${event.title} - Official Results | Forte Arena`;
+  const description =
+    event.summary ||
+    `Official competition results and podium standings for ${event.title} at Forte Arena.`;
+
+  return {
+    title,
+    description,
+    openGraph: {
+      title,
+      description,
+      url: `/results/${slug}`,
+      siteName: "Forte Arena",
+      type: "website",
+    },
+    twitter: {
+      card: "summary_large_image",
+      title,
+      description,
+    },
+  };
 }
 
 export default function EventResultsPage({ params }: EventResultsPageProps) {

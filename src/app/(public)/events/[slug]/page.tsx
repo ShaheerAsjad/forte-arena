@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
@@ -9,6 +10,7 @@ import { EventCard, CATEGORY_META } from "@/components/shared/EventCard";
 import { CategoryArtwork } from "@/components/shared/CategoryArtwork";
 import { EventDetailTabs } from "@/components/shared/EventDetailTabs";
 import { EventRegisterCard } from "@/components/shared/EventRegisterCard";
+import { StickyRegisterBar } from "@/features/events/components/StickyRegisterBar";
 import { EventsService, type EventWithDerivedStatus } from "@/features/events/services/events.service";
 import type { EventDetailItem } from "@/features/events/repositories/events.repository";
 import { RegistrationsRepository } from "@/features/registrations/repositories/registrations.repository";
@@ -24,6 +26,43 @@ import {
 
 interface EventDetailPageProps {
   params: Promise<{ slug: string }>;
+}
+
+export async function generateMetadata({
+  params,
+}: EventDetailPageProps): Promise<Metadata> {
+  const { slug } = await params;
+  const event = await EventsService.getEventDetails(slug);
+  if (!event) {
+    return {
+      title: "Event Not Found | Forte Arena",
+    };
+  }
+
+  const { item } = event;
+  const title = `${item.title} | Forte Arena`;
+  const description =
+    item.summary || `Join the ${item.title} competition at Forte Arena. Register before deadline.`;
+  const ogImage = item.posterUrl ? [item.posterUrl] : ["/og-image.png"];
+
+  return {
+    title,
+    description,
+    openGraph: {
+      title,
+      description,
+      url: `/events/${item.slug}`,
+      siteName: "Forte Arena",
+      images: ogImage,
+      type: "website",
+    },
+    twitter: {
+      card: "summary_large_image",
+      title,
+      description,
+      images: ogImage,
+    },
+  };
 }
 
 export default function EventDetailPage({ params }: EventDetailPageProps) {
@@ -254,10 +293,19 @@ async function EventRegisterSection({
   }
 
   return (
-    <EventRegisterCard
-      event={event}
-      isLoggedIn={isLoggedIn}
-      existingRegistration={existingRegistration}
-    />
+    <>
+      <EventRegisterCard
+        event={event}
+        isLoggedIn={isLoggedIn}
+        existingRegistration={existingRegistration}
+      />
+      <StickyRegisterBar
+        event={event.item}
+        derivedStatus={event.derivedStatus}
+        remainingSeats={event.remainingSeats}
+        isLoggedIn={isLoggedIn}
+        existingRegistration={existingRegistration}
+      />
+    </>
   );
 }

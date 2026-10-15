@@ -2,6 +2,7 @@
 
 import { useTransition } from "react";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
+import { motion, useReducedMotion } from "motion/react";
 import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
 import { Button } from "@/components/ui/Button";
@@ -31,6 +32,7 @@ export function EventsFilterBar() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [, startTransition] = useTransition();
+  const shouldReduceMotion = useReducedMotion();
 
   const currentCategory = searchParams.get("category") || "ALL";
   const currentStatus = searchParams.get("status") || "";
@@ -107,14 +109,29 @@ export function EventsFilterBar() {
             <button
               key={cat.id}
               onClick={() => updateParam("category", cat.id)}
-              className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all duration-200 cursor-pointer ${
+              className={`relative inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-colors duration-200 cursor-pointer ${
                 isSelected
-                  ? "bg-navy-900 text-ivory shadow-xs"
-                  : "bg-navy-50 text-ink/80 hover:bg-navy-100"
+                  ? "text-ivory"
+                  : "bg-navy-50 text-ink/80 hover:bg-navy-100 hover:text-navy-950"
               }`}
             >
-              {Icon && <Icon className={`w-3.5 h-3.5 ${isSelected ? "text-gold-400" : "text-mist"}`} />}
-              <span>{cat.label}</span>
+              {isSelected && (
+                <motion.span
+                  layoutId={shouldReduceMotion ? undefined : "activeCategoryChip"}
+                  transition={{ type: "spring", stiffness: 400, damping: 30 }}
+                  className="absolute inset-0 bg-navy-950 rounded-full shadow-xs -z-0"
+                />
+              )}
+              <span className="relative z-10 flex items-center gap-1.5">
+                {Icon && (
+                  <Icon
+                    className={`w-3.5 h-3.5 ${
+                      isSelected ? "text-gold-400" : "text-mist"
+                    }`}
+                  />
+                )}
+                <span>{cat.label}</span>
+              </span>
             </button>
           );
         })}

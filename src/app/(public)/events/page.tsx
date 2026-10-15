@@ -179,14 +179,42 @@ async function EventsGridLoader({
 function EventsListSkeleton() {
   return (
     <div className="space-y-6">
-      <Skeleton className="h-6 w-48" />
+      <div className="flex items-center justify-between px-1">
+        <Skeleton className="h-4 w-48 rounded-md" />
+        <Skeleton className="h-4 w-24 rounded-md" />
+      </div>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-7">
-        {Array.from({ length: 6 }).map((_, i) => (
-          <Card key={i} className="p-5 space-y-4 bg-white">
-            <Skeleton className="aspect-16/10 w-full rounded-xl" />
-            <Skeleton className="h-6 w-3/4" />
-            <Skeleton className="h-4 w-full" />
-            <Skeleton className="h-4 w-2/3" />
+        {Array.from({ length: 9 }).map((_, i) => (
+          <Card
+            key={i}
+            className="h-full flex flex-col overflow-hidden border border-navy-100 bg-white"
+          >
+            {/* Poster area skeleton */}
+            <div className="relative w-full aspect-16/10 bg-navy-100/70 animate-pulse">
+              <div className="absolute top-3 left-3 w-12 h-14 rounded-xl bg-white/70 shadow-sm" />
+              <div className="absolute top-3 right-3 w-20 h-6 rounded-full bg-white/70" />
+              <div className="absolute bottom-3 left-3 w-24 h-6 rounded-lg bg-navy-950/25" />
+            </div>
+
+            {/* Content body skeleton */}
+            <div className="p-5 flex-1 flex flex-col justify-between space-y-4">
+              <div className="space-y-2.5">
+                <Skeleton className="h-5 w-4/5 rounded-md" />
+                <Skeleton className="h-3.5 w-full rounded-md" />
+                <Skeleton className="h-3.5 w-2/3 rounded-md" />
+              </div>
+
+              <div className="space-y-2.5 pt-3 border-t border-navy-50">
+                <div className="flex items-center justify-between">
+                  <Skeleton className="h-3.5 w-28 rounded-md" />
+                  <Skeleton className="h-3.5 w-16 rounded-md" />
+                </div>
+                <div className="flex items-center justify-between pt-1">
+                  <Skeleton className="h-4 w-28 rounded-full" />
+                  <Skeleton className="h-3.5 w-16 rounded-md" />
+                </div>
+              </div>
+            </div>
           </Card>
         ))}
       </div>
