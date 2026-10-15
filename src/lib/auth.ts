@@ -4,12 +4,33 @@ import { nextCookies } from "better-auth/next-js";
 import { prisma } from "@/lib/prisma";
 import { env } from "@/config/env";
 
+const resolvedBaseURL =
+  process.env.BETTER_AUTH_URL ||
+  process.env.NEXT_PUBLIC_APP_URL ||
+  (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : undefined) ||
+  env.BETTER_AUTH_URL;
+
+const rawOrigins = [
+  env.BETTER_AUTH_URL,
+  env.NEXT_PUBLIC_APP_URL,
+  process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null,
+  ...(process.env.BETTER_AUTH_TRUSTED_ORIGINS
+    ? process.env.BETTER_AUTH_TRUSTED_ORIGINS.split(",").map((s) => s.trim())
+    : []),
+].filter(Boolean) as string[];
+
+const trustedOrigins = Array.from(new Set(rawOrigins));
+
 export const auth = betterAuth({
   database: prismaAdapter(prisma, {
     provider: "postgresql",
   }),
   secret: env.BETTER_AUTH_SECRET,
-  baseURL: env.BETTER_AUTH_URL,
+  baseURL: resolvedBaseURL,
+  trustedOrigins,
+  advanced: {
+    useSecureCookies: env.NODE_ENV === "production" || process.env.VERCEL === "1",
+  },
   emailAndPassword: {
     enabled: true,
     requireEmailVerification: false,
