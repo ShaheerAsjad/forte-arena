@@ -10,6 +10,18 @@ export interface AdminStats {
   approvedParticipants: number;
 }
 
+export interface DailyRegistrationCount {
+  date: string;
+  label: string;
+  count: number;
+}
+
+export interface CategoryRegistrationCount {
+  category: string;
+  count: number;
+  percentage: number;
+}
+
 export interface AdminRecentRegistration {
   id: string;
   status: RegistrationStatus;
@@ -114,6 +126,96 @@ export class AdminRepository {
     });
 
     return rows as unknown as AdminRecentRegistration[];
+  }
+
+  /**
+   * Registrations per day for the last N days (default 14 days)
+   */
+  static async getRegistrationsPerDay(days = 14): Promise<DailyRegistrationCount[]> {
+    await connection();
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - (days - 1));
+    startDate.setHours(0, 0, 0, 0);
+
+    const registrations = await prisma.registration.findMany({
+      where: {
+        createdAt: { gte: startDate },
+      },
+      select: {
+        createdAt: true,
+      },
+    });
+
+    // Group counts by YYYY-MM-DD
+    const countsMap = new Map<string, number>();
+    for (const reg of registrations) {
+      const d = new Date(reg.createdAt);
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+      countsMap.set(key, (countsMap.get(key) || 0) + 1);
+    }
+
+    const result: DailyRegistrationCount[] = [];
+    const months = [
+      "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+      "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
+    ];
+
+    for (let i = 0; i < days; i++) {
+      const curr = new Date(startDate);
+      curr.setDate(startDate.getDate() + i);
+      const key = `${curr.getFullYear()}-${String(curr.getMonth() + 1).padStart(2, "0")}-${String(curr.getDate()).padStart(2, "0")}`;
+      const label = `${months[curr.getMonth()]} ${curr.getDate()}`;
+      result.push({
+        date: key,
+        label,
+        count: countsMap.get(key) || 0,
+      });
+    }
+
+    return result;
+  }
+
+  /**
+   * Registrations breakdown by event category
+   */
+  static async getRegistrationsByCategory(): Promise<CategoryRegistrationCount[]> {
+    await connection();
+    const registrations = await prisma.registration.findMany({
+      select: {
+        event: {
+          select: {
+            category: true,
+          },
+        },
+      },
+    });
+
+    const categoryCounts: Record<string, number> = {
+      TECHNICAL: 0,
+      SPORTS: 0,
+      CULTURAL: 0,
+      ACADEMIC: 0,
+      GAMING: 0,
+      OTHER: 0,
+    };
+
+    let total = 0;
+    for (const reg of registrations) {
+      const cat = reg.event?.category || "OTHER";
+      categoryCounts[cat] = (categoryCounts[cat] || 0) + 1;
+      total++;
+    }
+
+    const categories = ["TECHNICAL", "SPORTS", "CULTURAL", "ACADEMIC", "GAMING", "OTHER"];
+    return categories.map((cat) => {
+      const count = categoryCounts[cat] || 0;
+      const percentage = total > 0 ? Math.round((count / total) * 100) : 0;
+      return {
+        category: cat,
+        count,
+        percentage,
+      };
+    });
   }
 
   /**

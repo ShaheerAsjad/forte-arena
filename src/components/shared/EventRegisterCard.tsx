@@ -1,12 +1,10 @@
 import Link from "next/link";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
-import { CountdownChip } from "@/components/shared/CountdownChip";
 import { FlipCountdown } from "@/components/shared/FlipCountdown";
 import { EventShareActions } from "@/features/events/components/EventShareActions";
 import { formatDeadline } from "@/lib/dates";
 import {
-  Clock,
   Users,
   User,
   Lock,

@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import { toast } from "sonner";
-import { CalendarPlus, Share2, Check, Copy } from "lucide-react";
+import { CalendarPlus, Share2, Check } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 
 interface EventShareActionsProps {

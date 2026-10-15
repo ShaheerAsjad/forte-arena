@@ -4,6 +4,9 @@ import { requireRole } from "@/lib/session";
 import { AdminRepository } from "@/features/admin/admin.repository";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
+import { CountUp } from "@/components/motion/CountUp";
+import { AdminRegistrationsDailyChart } from "@/features/admin/components/AdminRegistrationsDailyChart";
+import { AdminRegistrationsCategoryChart } from "@/features/admin/components/AdminRegistrationsCategoryChart";
 import {
   CalendarDays,
   Clock,
@@ -45,10 +48,13 @@ const REG_STATUS_BADGES: Record<
 async function AdminOverviewContent() {
   await requireRole(["ORGANIZER", "ADMIN"], "/login?next=/admin");
 
-  const [stats, recentRegistrations] = await Promise.all([
-    AdminRepository.getAdminStats(),
-    AdminRepository.getRecentRegistrations(8),
-  ]);
+  const [stats, recentRegistrations, dailyRegistrations, categoryRegistrations] =
+    await Promise.all([
+      AdminRepository.getAdminStats(),
+      AdminRepository.getRecentRegistrations(8),
+      AdminRepository.getRegistrationsPerDay(14),
+      AdminRepository.getRegistrationsByCategory(),
+    ]);
 
   return (
     <div className="space-y-8 animate-in fade-in duration-300">
@@ -98,7 +104,7 @@ async function AdminOverviewContent() {
             </p>
             <div className="flex items-baseline gap-2 mt-0.5">
               <span className="text-3xl font-black font-heading text-navy-950">
-                {stats.totalEvents}
+                <CountUp to={stats.totalEvents} />
               </span>
               <span className="text-xs font-medium text-emerald-700">
                 ({stats.publishedEvents} published)
@@ -119,7 +125,7 @@ async function AdminOverviewContent() {
             </p>
             <div className="flex items-baseline gap-2 mt-0.5">
               <span className="text-3xl font-black font-heading text-amber-950">
-                {stats.pendingRegistrations}
+                <CountUp to={stats.pendingRegistrations} />
               </span>
               {stats.pendingRegistrations > 0 && (
                 <span className="text-xs font-bold text-amber-700 animate-pulse">
@@ -142,13 +148,23 @@ async function AdminOverviewContent() {
             </p>
             <div className="flex items-baseline gap-2 mt-0.5">
               <span className="text-3xl font-black font-heading text-navy-950">
-                {stats.approvedParticipants}
+                <CountUp to={stats.approvedParticipants} />
               </span>
               <span className="text-xs font-medium text-emerald-700">Verified</span>
             </div>
             <p className="text-xs text-mist mt-1">Confirmed competitors</p>
           </div>
         </Card>
+      </div>
+
+      {/* Analytics Visualizations: 14-Day Velocity & Category Distribution */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+        <div className="lg:col-span-7">
+          <AdminRegistrationsDailyChart data={dailyRegistrations} />
+        </div>
+        <div className="lg:col-span-5">
+          <AdminRegistrationsCategoryChart data={categoryRegistrations} />
+        </div>
       </div>
 
       {/* Recent Registrations Table Card */}
@@ -274,6 +290,10 @@ export default function AdminPage() {
             <div className="h-32 bg-navy-100/50 rounded-2xl" />
             <div className="h-32 bg-navy-100/50 rounded-2xl" />
             <div className="h-32 bg-navy-100/50 rounded-2xl" />
+          </div>
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+            <div className="lg:col-span-7 h-64 bg-navy-100/50 rounded-2xl" />
+            <div className="lg:col-span-5 h-64 bg-navy-100/50 rounded-2xl" />
           </div>
           <div className="h-80 bg-navy-100/50 rounded-2xl" />
         </div>
