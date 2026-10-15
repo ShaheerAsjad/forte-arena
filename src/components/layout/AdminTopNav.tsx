@@ -30,7 +30,7 @@ export function AdminTopNav() {
         {/* Upper Top Bar: Logo & User Control */}
         <div className="flex items-center justify-between py-3.5 border-b border-navy-50">
           <div className="flex items-center gap-3">
-            <Logo size="sm" />
+            <Logo size="sm" href="/admin" />
             <span className="text-xs px-2.5 py-0.5 rounded-full bg-navy-100 text-navy-900 font-bold uppercase tracking-wider">
               Organizer Console
             </span>

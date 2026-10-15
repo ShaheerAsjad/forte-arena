@@ -139,9 +139,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
               <Menu className="w-5 h-5" />
             </button>
 
-            <Link href="/admin" className="flex items-center gap-2">
-              <Logo size="sm" />
-            </Link>
+            <Logo size="sm" href="/admin" />
 
             <div className="hidden sm:flex items-center gap-1.5 ml-1">
               <span className="text-[10px] font-extrabold uppercase tracking-widest text-navy-950 bg-navy-100/90 border border-navy-200/80 px-2.5 py-0.5 rounded-full">
@@ -263,7 +261,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
                   {/* Drawer Header */}
                   <div className="flex items-center justify-between pb-3 border-b border-navy-100">
                     <div className="flex items-center gap-2">
-                      <Logo size="sm" />
+                      <Logo size="sm" href="/admin" />
                       <span className="text-[10px] font-extrabold uppercase tracking-wider text-navy-950 bg-navy-100 px-2 py-0.5 rounded-full">
                         ORGANIZER
                       </span>

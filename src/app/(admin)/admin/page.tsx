@@ -1,5 +1,6 @@
 import { Suspense } from "react";
 import Link from "next/link";
+import { requireRole } from "@/lib/session";
 import { AdminRepository } from "@/features/admin/admin.repository";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
@@ -42,6 +43,8 @@ const REG_STATUS_BADGES: Record<
 };
 
 async function AdminOverviewContent() {
+  await requireRole(["ORGANIZER", "ADMIN"], "/login?next=/admin");
+
   const [stats, recentRegistrations] = await Promise.all([
     AdminRepository.getAdminStats(),
     AdminRepository.getRecentRegistrations(8),
