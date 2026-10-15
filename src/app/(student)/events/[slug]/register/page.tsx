@@ -8,7 +8,7 @@ import { prisma } from "@/lib/prisma";
 import { RegisterStepper } from "@/features/registrations/RegisterStepper";
 import { parseRegistrationAttempts } from "@/features/registrations/registrations.rules";
 import { Card } from "@/components/ui/Card";
-import { ArrowLeft, AlertCircle, CheckCircle2, LayoutDashboard } from "lucide-react";
+import { ArrowLeft, AlertCircle } from "lucide-react";
 
 interface RegisterPageProps {
   params: Promise<{ slug: string }>;
@@ -83,42 +83,6 @@ async function RegisterContent({ slug }: { slug: string }) {
 
   // Check existing registration
   const existing = await RegistrationsRepository.findExistingRegistration(event.id, user.id);
-  if (existing && existing.status !== "WITHDRAWN") {
-    return (
-      <div className="space-y-6">
-        <div className="text-center space-y-4 py-2">
-          <div className="w-14 h-14 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-600 mx-auto flex items-center justify-center">
-            <CheckCircle2 className="w-7 h-7" />
-          </div>
-          <div className="space-y-1">
-            <h2 className="text-xl sm:text-2xl font-bold text-navy-950 font-heading">
-              Already Registered
-            </h2>
-            <p className="text-mist text-sm max-w-sm mx-auto">
-              You already have an active registration ({existing.status}) for{" "}
-              <span className="font-semibold text-navy-950">{event.title}</span>.
-            </p>
-          </div>
-          <div className="flex flex-col gap-2 pt-2">
-            <Link
-              href="/dashboard"
-              className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-gold-400 text-navy-950 text-sm font-bold hover:bg-gold-300 transition shadow-sm"
-            >
-              <LayoutDashboard className="w-4 h-4" />
-              Go to Dashboard
-            </Link>
-            <Link
-              href={`/dashboard/${existing.id}`}
-              className="text-xs text-mist hover:text-navy-950 font-medium transition py-1"
-            >
-              View Registration Details
-            </Link>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   const isWithdrawn = existing?.status === "WITHDRAWN";
   const attempts = parseRegistrationAttempts(existing?.notes);
   if (isWithdrawn && attempts >= 2) {
@@ -178,36 +142,26 @@ async function RegisterContent({ slug }: { slug: string }) {
   }
 
   return (
-    <div>
-      <div className="mb-6">
-        <p className="text-xs font-bold uppercase tracking-wider text-mist mb-1">
-          Registering for
-        </p>
-        <h1 className="text-xl font-bold text-navy-950 font-heading">
-          {event.title}
-        </h1>
-      </div>
-
-      <RegisterStepper
-        event={{
-          id: event.id,
-          slug: event.slug,
-          title: event.title,
-          participationType: event.participationType,
-          minTeamSize: event.minTeamSize,
-          maxTeamSize: event.maxTeamSize,
-          venue: event.venue,
-          registrationDeadline: event.registrationDeadline,
-        }}
-        profile={{
-          name: dbUser.name ?? user.name ?? "",
-          email: dbUser.email ?? user.email ?? "",
-          rollNumber: dbUser.rollNumber,
-          department: dbUser.department,
-          phone: dbUser.phone,
-        }}
-        isReapplication={isWithdrawn}
-      />
-    </div>
+    <RegisterStepper
+      event={{
+        id: event.id,
+        slug: event.slug,
+        title: event.title,
+        participationType: event.participationType,
+        minTeamSize: event.minTeamSize,
+        maxTeamSize: event.maxTeamSize,
+        venue: event.venue,
+        registrationDeadline: event.registrationDeadline,
+      }}
+      profile={{
+        name: dbUser.name ?? user.name ?? "",
+        email: dbUser.email ?? user.email ?? "",
+        rollNumber: dbUser.rollNumber,
+        department: dbUser.department,
+        phone: dbUser.phone,
+      }}
+      isReapplication={isWithdrawn}
+      existingRegistration={existing}
+    />
   );
 }

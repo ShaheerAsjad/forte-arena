@@ -1,6 +1,8 @@
 import { connection } from "next/server";
 import { prisma } from "@/lib/prisma";
 import type { RegistrationStatus } from "@/lib/db-types";
+import { ConflictError } from "@/lib/errors";
+import { assertRollNumbersAvailable } from "../registrations.rules";
 
 // ────────────────────────────────────────────────────────────────
 // Selects
@@ -157,7 +159,8 @@ export class RegistrationsRepository {
 
   /**
    * Create a team + team members + leader registration in a single transaction.
-   * Handles re-registration if leader previously withdrew.
+   * Handles re-registration if leader previously withdrew, replacing any old withdrawn team.
+   * Prevents duplicates against other ACTIVE teams (PENDING/APPROVED/REJECTED).
    */
   static async createTeamRegistration(payload: {
     eventId: string;
@@ -168,23 +171,99 @@ export class RegistrationsRepository {
     notes?: string;
   }) {
     const notes = payload.notes || "attempt:1";
+    const trimmedTeamName = payload.teamName.trim();
+
     return prisma.$transaction(async (tx) => {
-      // Put leader as the first member of the team
+      // 1. If leader previously had a team that was withdrawn, clean up the old team
+      const existingLeaderReg = await tx.registration.findUnique({
+        where: {
+          eventId_userId: {
+            eventId: payload.eventId,
+            userId: payload.leaderId,
+          },
+        },
+        select: { id: true, status: true, teamId: true },
+      });
+
+      if (existingLeaderReg?.teamId) {
+        await tx.team.deleteMany({
+          where: { id: existingLeaderReg.teamId },
+        });
+      }
+
+      // 2. Check if a team with this name exists for this event
+      const existingTeamWithName = await tx.team.findFirst({
+        where: {
+          eventId: payload.eventId,
+          name: { equals: trimmedTeamName, mode: "insensitive" },
+        },
+        include: {
+          registrations: {
+            select: { id: true, status: true },
+          },
+        },
+      });
+
+      if (existingTeamWithName) {
+        const hasActiveRegistrations = existingTeamWithName.registrations.some((r) =>
+          ["PENDING", "APPROVED", "REJECTED"].includes(r.status)
+        );
+        if (hasActiveRegistrations) {
+          throw new ConflictError("This team name is already taken for this event");
+        }
+        // If it's a withdrawn/abandoned team, delete it so it doesn't block unique constraint
+        await tx.team.delete({
+          where: { id: existingTeamWithName.id },
+        });
+      }
+
+      // 3. Check for duplicate roll numbers across other ACTIVE teams
+      const proposedRollNumbers = [
+        payload.leaderMember.rollNumber.trim(),
+        ...payload.members.map((m) => m.rollNumber.trim()),
+      ];
+
+      const activeMembers = await tx.teamMember.findMany({
+        where: {
+          team: {
+            eventId: payload.eventId,
+            registrations: {
+              some: {
+                status: { in: ["PENDING", "APPROVED", "REJECTED"] },
+                userId: { not: payload.leaderId },
+              },
+            },
+          },
+        },
+        select: {
+          rollNumber: true,
+        },
+      });
+
+      const activeRollNumbers = activeMembers.map((am) => am.rollNumber);
+      assertRollNumbersAvailable(proposedRollNumbers, activeRollNumbers);
+
+      // 4. Put leader as the first member of the team
       const allMembers = [
         {
-          fullName: payload.leaderMember.fullName,
-          rollNumber: payload.leaderMember.rollNumber,
+          fullName: payload.leaderMember.fullName.trim(),
+          rollNumber: payload.leaderMember.rollNumber.trim(),
           email: payload.leaderMember.email,
           phone: payload.leaderMember.phone,
         },
-        ...payload.members,
+        ...payload.members.map((m) => ({
+          fullName: m.fullName.trim(),
+          rollNumber: m.rollNumber.trim(),
+          email: m.email,
+          phone: m.phone,
+        })),
       ];
 
       const team = await tx.team.create({
         data: {
           eventId: payload.eventId,
           leaderId: payload.leaderId,
-          name: payload.teamName,
+          name: trimmedTeamName,
           members: {
             create: allMembers,
           },
@@ -236,22 +315,36 @@ export class RegistrationsRepository {
 
   /**
    * Withdraw (soft-delete by status update) a registration and record withdrawal note.
+   * If this registration was for a team, removes the team so its name and roll numbers
+   * no longer block re-application or other teams.
    */
   static async withdrawRegistration(registrationId: string) {
-    const current = await prisma.registration.findUnique({
-      where: { id: registrationId },
-      select: { notes: true },
-    });
-    const currentAttempts = current?.notes?.match(/attempt:(\d+)/)?.[1] || "1";
-    const withdrawalNote = `attempt:${currentAttempts}|withdrawn:${currentAttempts}`;
+    return prisma.$transaction(async (tx) => {
+      const current = await tx.registration.findUnique({
+        where: { id: registrationId },
+        select: { notes: true, teamId: true },
+      });
+      const currentAttempts = current?.notes?.match(/attempt:(\d+)/)?.[1] || "1";
+      const withdrawalNote = `attempt:${currentAttempts}|withdrawn:${currentAttempts}`;
 
-    return prisma.registration.update({
-      where: { id: registrationId },
-      data: {
-        status: "WITHDRAWN",
-        notes: withdrawalNote,
-      },
-      select: { id: true, status: true },
+      const reg = await tx.registration.update({
+        where: { id: registrationId },
+        data: {
+          status: "WITHDRAWN",
+          notes: withdrawalNote,
+          teamId: null,
+        },
+        select: { id: true, status: true },
+      });
+
+      if (current?.teamId) {
+        // Delete the withdrawn team (cascading team members)
+        await tx.team.deleteMany({
+          where: { id: current.teamId },
+        });
+      }
+
+      return reg;
     });
   }
 }

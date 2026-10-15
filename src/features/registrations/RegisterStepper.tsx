@@ -49,6 +49,7 @@ interface RegisterStepperProps {
   event: EventInfo;
   profile: UserProfile;
   isReapplication?: boolean;
+  existingRegistration?: { id: string; status: string } | null;
 }
 
 const teamMemberSchema = z.object({
@@ -124,6 +125,7 @@ export function RegisterStepper({
   event,
   profile,
   isReapplication = false,
+  existingRegistration = null,
 }: RegisterStepperProps) {
   const isTeam = event.participationType === "TEAM";
   const steps = isTeam ? TEAM_STEPS : INDIVIDUAL_STEPS;
@@ -139,6 +141,17 @@ export function RegisterStepper({
   const [step, setStep] = useState(0);
   const [isPending, startTransition] = useTransition();
   const [submittedSummary, setSubmittedSummary] = useState<SubmittedSummary | null>(null);
+
+  const header = (
+    <div className="mb-6">
+      <p className="text-xs font-bold uppercase tracking-wider text-mist mb-1">
+        Registering for
+      </p>
+      <h1 className="text-xl font-bold text-navy-950 font-heading">
+        {event.title}
+      </h1>
+    </div>
+  );
 
   const reapplicationBanner = isReapplication ? (
     <div className="p-3.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-xs sm:text-sm flex items-start gap-2.5">
@@ -181,6 +194,42 @@ export function RegisterStepper({
         event={event}
         profile={profile}
       />
+    );
+  }
+
+  if (existingRegistration && existingRegistration.status !== "WITHDRAWN") {
+    return (
+      <div className="space-y-6">
+        <div className="text-center space-y-4 py-2">
+          <div className="w-14 h-14 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-600 mx-auto flex items-center justify-center">
+            <CheckCircle2 className="w-7 h-7" />
+          </div>
+          <div className="space-y-1">
+            <h2 className="text-xl sm:text-2xl font-bold text-navy-950 font-heading">
+              Already Registered
+            </h2>
+            <p className="text-mist text-sm max-w-sm mx-auto">
+              You already have an active registration ({existingRegistration.status}) for{" "}
+              <span className="font-semibold text-navy-950">{event.title}</span>.
+            </p>
+          </div>
+          <div className="flex flex-col gap-2 pt-2">
+            <Link
+              href="/dashboard"
+              className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-gold-400 text-navy-950 text-sm font-bold hover:bg-gold-300 transition shadow-sm"
+            >
+              <LayoutDashboard className="w-4 h-4" />
+              Go to Dashboard
+            </Link>
+            <Link
+              href={`/dashboard/${existingRegistration.id}`}
+              className="text-xs text-mist hover:text-navy-950 font-medium transition py-1 text-center"
+            >
+              View Registration Details
+            </Link>
+          </div>
+        </div>
+      </div>
     );
   }
 
@@ -229,6 +278,7 @@ export function RegisterStepper({
   if (step === 0) {
     return (
       <div className="space-y-6">
+        {header}
         {reapplicationBanner}
         <StepIndicator steps={steps} currentStep={0} />
         <div className="space-y-4">
@@ -277,6 +327,7 @@ export function RegisterStepper({
   if (isTeam && step === 1) {
     return (
       <div className="space-y-6">
+        {header}
         {reapplicationBanner}
         <StepIndicator steps={steps} currentStep={1} />
         <div className="space-y-5">
@@ -419,6 +470,7 @@ export function RegisterStepper({
     const teamValues = isTeam ? getValues() : null;
     return (
       <div className="space-y-6">
+        {header}
         {reapplicationBanner}
         <StepIndicator steps={steps} currentStep={reviewStepIndex} />
         <div className="space-y-4">

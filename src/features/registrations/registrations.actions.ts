@@ -4,7 +4,7 @@ import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/session";
-import { ConflictError, AppError } from "@/lib/errors";
+import { AppError } from "@/lib/errors";
 import { RegistrationsRepository } from "./repositories/registrations.repository";
 import { EventsRepository } from "@/features/events/repositories/events.repository";
 import {
@@ -16,6 +16,7 @@ import {
   assertWithdrawAllowed,
   assertLeaderInTeam,
   assertCanRegister,
+  mapPrismaError,
 } from "./registrations.rules";
 
 // ────────────────────────────────────────────────────────────────
@@ -50,21 +51,6 @@ function checkRateLimit(key: string): void {
 type ActionResult<T = void> =
   | { ok: true; data: T }
   | { ok: false; error: string };
-
-function mapPrismaError(err: unknown): string {
-  if (
-    err instanceof Error &&
-    "code" in err &&
-    (err as { code: string }).code === "P2002"
-  ) {
-    return new ConflictError(
-      "A record with this information already exists. This may be a duplicate registration or team name."
-    ).message;
-  }
-  if (err instanceof AppError) return err.message;
-  if (err instanceof Error) return err.message;
-  return "An unexpected error occurred.";
-}
 
 // ────────────────────────────────────────────────────────────────
 // Zod Schemas

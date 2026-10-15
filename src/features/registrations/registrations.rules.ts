@@ -192,4 +192,128 @@ export function assertCanRegister(
   }
 }
 
+// ────────────────────────────────────────────────────────────────
+// Duplicate checks across active teams for an event
+// ────────────────────────────────────────────────────────────────
+
+export function assertTeamNameAvailable(
+  proposedName: string,
+  existingTeams: Array<{
+    name: string;
+    hasActiveRegistrations: boolean;
+  }>
+): void {
+  const normalizedProposed = proposedName.trim().toUpperCase();
+  for (const team of existingTeams) {
+    if (
+      team.hasActiveRegistrations &&
+      team.name.trim().toUpperCase() === normalizedProposed
+    ) {
+      throw new ConflictError("This team name is already taken for this event");
+    }
+  }
+}
+
+export function assertRollNumbersAvailable(
+  proposedRollNumbers: string[],
+  activeRollNumbers: string[]
+): void {
+  const activeSet = new Set(
+    activeRollNumbers.map((rn) => rn.trim().toUpperCase())
+  );
+  for (const rn of proposedRollNumbers) {
+    const normalized = rn.trim().toUpperCase();
+    if (activeSet.has(normalized)) {
+      throw new ConflictError(
+        `Roll number ${rn.trim()} is already in another team for this event`
+      );
+    }
+  }
+}
+
+// ────────────────────────────────────────────────────────────────
+// Prisma unique constraint error mapping
+// ────────────────────────────────────────────────────────────────
+
+export function mapPrismaError(err: unknown): string {
+  if (
+    err instanceof Error &&
+    "code" in err &&
+    (err as { code: string }).code === "P2002"
+  ) {
+    const meta = (
+      err as {
+        message?: string;
+        meta?: {
+          target?: string[] | string;
+          modelName?: string;
+          driverAdapterError?: {
+            cause?: {
+              originalMessage?: string;
+              constraint?: { index?: string };
+              table?: string;
+            };
+          };
+        };
+      }
+    ).meta;
+    const target = Array.isArray(meta?.target)
+      ? meta.target.join(",")
+      : String(meta?.target ?? "");
+    const modelName = String(meta?.modelName ?? "");
+    const driverMsg = String(
+      meta?.driverAdapterError?.cause?.originalMessage ?? ""
+    );
+    const constraintIndex = String(
+      meta?.driverAdapterError?.cause?.constraint?.index ?? ""
+    );
+    const table = String(meta?.driverAdapterError?.cause?.table ?? "");
+    const errMessage = err instanceof Error ? err.message : "";
+
+    if (
+      target.includes("name") ||
+      modelName === "Team" ||
+      table === "teams" ||
+      driverMsg.includes("teams_eventId_name_key") ||
+      constraintIndex.includes("teams_eventId_name_key") ||
+      errMessage.includes("teams_eventId_name_key")
+    ) {
+      return "This team name is already taken for this event";
+    }
+
+    if (
+      target.includes("rollNumber") ||
+      modelName === "TeamMember" ||
+      table === "team_members" ||
+      driverMsg.includes("team_members") ||
+      constraintIndex.includes("team_members") ||
+      errMessage.includes("team_members")
+    ) {
+      const match =
+        driverMsg.match(/Key \((?:rollNumber|roll_number)\)=\(([^)]+)\)/i) ||
+        errMessage.match(/Key \((?:rollNumber|roll_number)\)=\(([^)]+)\)/i);
+      if (match && match[1]) {
+        return `Roll number ${match[1].trim()} is already in another team for this event`;
+      }
+      return "Roll number is already in another team for this event";
+    }
+
+    if (
+      target.includes("userId") ||
+      modelName === "Registration" ||
+      table === "registrations" ||
+      driverMsg.includes("registrations_eventId_userId_key") ||
+      constraintIndex.includes("registrations_eventId_userId_key") ||
+      errMessage.includes("registrations_eventId_userId_key")
+    ) {
+      return "You are already registered for this event";
+    }
+
+    return "A record with this information already exists. This may be a duplicate registration or team name.";
+  }
+  if (err instanceof AppError) return err.message;
+  if (err instanceof Error) return err.message;
+  return "An unexpected error occurred.";
+}
+
 

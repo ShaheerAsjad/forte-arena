@@ -487,35 +487,36 @@ async function main() {
     });
   }
 
-  // 6. Announcements (4 total: 2 pinned, 2 unpinned)
-  const announcements = [
+  // 6. Announcements (3 certificate-related bulletins)
+  const certificateAnnouncements = [
     {
-      title: "Welcome to Forté Arena 2026 — Schedule & Portal Guide",
-      body: "Welcome to Forté Arena 2026! Online registrations are now open for collegiate tournaments across Technical, Sports, Gaming, and Cultural arts. Check event rules, verify team rosters, and track your registrations through your Student Dashboard.",
+      title: "Certificates for Completed Events Issued to Winners and Participants",
+      body: "Official digital merit and participation certificates for all completed events (including Blitz Chess and RoboWars) will be issued directly to verified winners and participants. Physical certificates and trophies may also be collected from the campus lead office.",
       pinned: true,
-      publishedAt: new Date("2026-10-10T09:00:00.000Z"),
+      publishedAt: new Date("2026-10-14T09:00:00.000Z"),
     },
     {
-      title: "Venue Protocol & ID Card Requirement for Campus Entry",
-      body: "All participants and contingents must carry their official University Student ID Card for physical entry into the Sports Complex, CS Labs, and Central Auditorium. Security wristbands will be issued at the main registration desk.",
-      pinned: true,
-      publishedAt: new Date("2026-10-12T10:00:00.000Z"),
-    },
-    {
-      title: "Valorant Campus Clash Roster Lock Approaching",
-      body: "Final reminder for esports teams: team roster submissions for Valorant Campus Clash will close within the next 24 hours. Ensure all substitution slots are finalized before the bracket seeding broadcast.",
+      title: "How to Download Your Certificate from the Results Page",
+      body: "Students can now download their verifiable digital certificates directly from the Results page. Navigate to Results, locate your completed competition, and click 'Download Certificate' beside your team or individual placement.",
       pinned: false,
-      publishedAt: new Date("2026-10-13T14:00:00.000Z"),
+      publishedAt: new Date("2026-10-14T11:00:00.000Z"),
     },
     {
-      title: "SpeedChess & RoboWars Results Published",
-      body: "Official tournament brackets and certified rankings for the SpeedChess Championship and RoboWars Arena Battle are now live on the Results page. Congratulations to all podium winners!",
+      title: "Certificate Policy: Issued Only to Approved Participants Matching Registration Name",
+      body: "Certificates are issued strictly to approved participants whose names exactly match their verified registration credentials and institutional ID. In case of any name discrepancies or corrections, please reach out to the organizing desk.",
       pinned: false,
-      publishedAt: new Date("2026-10-14T08:00:00.000Z"),
+      publishedAt: new Date("2026-10-14T13:00:00.000Z"),
     },
   ];
 
-  for (const a of announcements) {
+  // Remove any legacy announcements that are not in the new 3
+  await prisma.announcement.deleteMany({
+    where: {
+      title: { notIn: certificateAnnouncements.map((a) => a.title) },
+    },
+  });
+
+  for (const a of certificateAnnouncements) {
     const existing = await prisma.announcement.findFirst({
       where: { title: a.title },
     });
@@ -541,7 +542,9 @@ async function main() {
     }
   }
 
-  console.log("Seeding complete: 6 events, 8 students, 7 registrations, 7 results, 4 announcements.");
+  const announcementCount = await prisma.announcement.count();
+  console.log(`Announcements verified: ${announcementCount} rows.`);
+  console.log("Seeding complete: 6 events, 8 students, 7 registrations, 7 results, 3 announcements.");
 }
 
 main()
