@@ -115,7 +115,13 @@ export class RegistrationsRepository {
     await connection();
     return prisma.registration.findUnique({
       where: { eventId_userId: { eventId, userId } },
-      select: { id: true, status: true, notes: true },
+      select: {
+        id: true,
+        status: true,
+        notes: true,
+        attemptCount: true,
+        withdrawCount: true,
+      },
     });
   }
 
@@ -134,8 +140,7 @@ export class RegistrationsRepository {
    */
   static async createIndividualRegistration(
     eventId: string,
-    userId: string,
-    notes = "attempt:1"
+    userId: string
   ) {
     return prisma.registration.upsert({
       where: { eventId_userId: { eventId, userId } },
@@ -143,15 +148,17 @@ export class RegistrationsRepository {
         eventId,
         userId,
         status: "PENDING",
-        notes,
+        attemptCount: 1,
+        withdrawCount: 0,
       },
       update: {
         teamId: null,
         status: "PENDING",
-        notes,
+        attemptCount: { increment: 1 },
         rejectionReason: null,
         reviewedById: null,
         reviewedAt: null,
+        notes: null,
       },
       select: { id: true, status: true },
     });
@@ -168,9 +175,7 @@ export class RegistrationsRepository {
     teamName: string;
     leaderMember: { fullName: string; rollNumber: string; email?: string; phone?: string };
     members: Array<{ fullName: string; rollNumber: string; email?: string; phone?: string }>;
-    notes?: string;
   }) {
-    const notes = payload.notes || "attempt:1";
     const trimmedTeamName = payload.teamName.trim();
 
     return prisma.$transaction(async (tx) => {
@@ -283,15 +288,17 @@ export class RegistrationsRepository {
           userId: payload.leaderId,
           teamId: team.id,
           status: "PENDING",
-          notes,
+          attemptCount: 1,
+          withdrawCount: 0,
         },
         update: {
           teamId: team.id,
           status: "PENDING",
-          notes,
+          attemptCount: { increment: 1 },
           rejectionReason: null,
           reviewedById: null,
           reviewedAt: null,
+          notes: null,
         },
         select: { id: true, status: true, teamId: true },
       });
@@ -322,16 +329,14 @@ export class RegistrationsRepository {
     return prisma.$transaction(async (tx) => {
       const current = await tx.registration.findUnique({
         where: { id: registrationId },
-        select: { notes: true, teamId: true },
+        select: { teamId: true },
       });
-      const currentAttempts = current?.notes?.match(/attempt:(\d+)/)?.[1] || "1";
-      const withdrawalNote = `attempt:${currentAttempts}|withdrawn:${currentAttempts}`;
 
       const reg = await tx.registration.update({
         where: { id: registrationId },
         data: {
           status: "WITHDRAWN",
-          notes: withdrawalNote,
+          withdrawCount: { increment: 1 },
           teamId: null,
         },
         select: { id: true, status: true },

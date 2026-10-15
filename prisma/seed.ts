@@ -308,28 +308,28 @@ async function main() {
       position: 1,
       award: "Grandmaster Champion & Gold Medal",
       remarks: "Undefeated across all 7 rounds",
-      certificateUrl: "https://certificates.forte-arena.edu/chess-2026/ahmad-raza.pdf",
+      certificateUrl: null,
     },
     {
       studentEmail: "demo2@demo.forte-arena.edu",
       position: 2,
       award: "Silver Medal",
       remarks: "Narrowly finished 2nd after blitz tie-break",
-      certificateUrl: "https://certificates.forte-arena.edu/chess-2026/fatima-noor.pdf",
+      certificateUrl: null,
     },
     {
       studentEmail: "demo3@demo.forte-arena.edu",
       position: 3,
       award: "Bronze Medal",
       remarks: "Secured podium with tactical endgame play",
-      certificateUrl: "https://certificates.forte-arena.edu/chess-2026/bilal-hassan.pdf",
+      certificateUrl: null,
     },
     {
       studentEmail: "demo4@demo.forte-arena.edu",
       position: 4,
       award: "Top Junior Trophy",
       remarks: "Highest rated under-20 collegiate competitor",
-      certificateUrl: "https://certificates.forte-arena.edu/chess-2026/zainab-tariq.pdf",
+      certificateUrl: null,
     },
   ];
 
@@ -382,7 +382,7 @@ async function main() {
       position: 1,
       award: "Arena Heavyweight Champion Trophy",
       remarks: "Pneumatic flipper robot undefeated throughout bracket",
-      certificateUrl: "https://certificates.forte-arena.edu/robowars-2026/mechatitans.pdf",
+      certificateUrl: null,
     },
     {
       teamName: "CyberVipers",
@@ -391,7 +391,7 @@ async function main() {
       position: 2,
       award: "Runner-Up Silver Trophy",
       remarks: "High-RPM vertical spinner finalist",
-      certificateUrl: "https://certificates.forte-arena.edu/robowars-2026/cybervipers.pdf",
+      certificateUrl: null,
     },
     {
       teamName: "CircuitBreakers",
@@ -400,7 +400,7 @@ async function main() {
       position: 3,
       award: "Bronze Trophy",
       remarks: "Fast wedge bot with exceptional arena control",
-      certificateUrl: "https://certificates.forte-arena.edu/robowars-2026/circuitbreakers.pdf",
+      certificateUrl: null,
     },
   ];
 
@@ -497,7 +497,7 @@ async function main() {
     },
     {
       title: "How to Download Your Certificate from the Results Page",
-      body: "Students can now download their verifiable digital certificates directly from the Results page. Navigate to Results, locate your completed competition, and click 'Download Certificate' beside your team or individual placement.",
+      body: "Certificates will be available on the Results page once the organizer uploads them.",
       pinned: false,
       publishedAt: new Date("2026-10-14T11:00:00.000Z"),
     },
@@ -508,13 +508,6 @@ async function main() {
       publishedAt: new Date("2026-10-14T13:00:00.000Z"),
     },
   ];
-
-  // Remove any legacy announcements that are not in the new 3
-  await prisma.announcement.deleteMany({
-    where: {
-      title: { notIn: certificateAnnouncements.map((a) => a.title) },
-    },
-  });
 
   for (const a of certificateAnnouncements) {
     const existing = await prisma.announcement.findFirst({

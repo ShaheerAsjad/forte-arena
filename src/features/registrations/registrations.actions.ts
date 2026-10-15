@@ -122,13 +122,9 @@ export async function registerIndividual(
       return { ok: false, error: "Please complete your profile before registering." };
     }
 
-    const isReapplying = existing && existing.status === "WITHDRAWN";
-    const notes = isReapplying ? "attempt:2|withdrawn:1" : "attempt:1";
-
     const registration = await RegistrationsRepository.createIndividualRegistration(
       event.id,
-      user.id,
-      notes
+      user.id
     );
 
     revalidatePath(`/events/${eventSlug}`);
@@ -177,9 +173,6 @@ export async function registerTeam(
     const existing = await RegistrationsRepository.findExistingRegistration(event.id, user.id);
     assertCanRegister(existing);
 
-    const isReapplying = existing && existing.status === "WITHDRAWN";
-    const notes = isReapplying ? "attempt:2|withdrawn:1" : "attempt:1";
-
     // Team size: leader counts as 1 + additional members
     const totalMembers = 1 + members.length;
     assertTeamSize(totalMembers, event.minTeamSize, event.maxTeamSize);
@@ -208,7 +201,6 @@ export async function registerTeam(
         email: m.email || undefined,
         phone: m.phone || undefined,
       })),
-      notes,
     });
 
     // Verification check: re-fetch team and confirm current session user appears in it

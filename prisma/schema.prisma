@@ -113,6 +113,8 @@ model Registration {
   status          RegistrationStatus @default(PENDING)
   notes           String?
   rejectionReason String?
+  attemptCount    Int                @default(1)
+  withdrawCount   Int                @default(0)
   reviewedById    String?
   reviewedAt      DateTime?
   createdAt       DateTime           @default(now())

@@ -16,7 +16,7 @@ import {
 const ADMIN_TABS = [
   { href: "/admin", label: "Overview", icon: LayoutDashboard },
   { href: "/admin/events", label: "Events", icon: CalendarDays },
-  { href: "/admin/events/registrations", label: "Registrations", icon: Users },
+  { href: "/admin/registrations", label: "Registrations", icon: Users },
   { href: "/admin/results", label: "Results", icon: Trophy },
   { href: "/admin/announcements", label: "Announcements", icon: Megaphone },
 ];

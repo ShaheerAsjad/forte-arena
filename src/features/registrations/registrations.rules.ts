@@ -162,9 +162,23 @@ export function isActiveRegistration(status: RegistrationStatus): boolean {
 
 export const MAX_REGISTRATION_ATTEMPTS = 2;
 
-export function parseRegistrationAttempts(notes?: string | null): number {
-  if (!notes) return 1;
-  const match = notes.match(/attempts?:(\d+)/i);
+export function parseRegistrationAttempts(
+  registrationOrNotes?:
+    | {
+        attemptCount?: number | null;
+        notes?: string | null;
+      }
+    | string
+    | null
+): number {
+  if (!registrationOrNotes) return 1;
+  if (typeof registrationOrNotes === "object") {
+    if (typeof registrationOrNotes.attemptCount === "number") {
+      return registrationOrNotes.attemptCount;
+    }
+    return parseRegistrationAttempts(registrationOrNotes.notes);
+  }
+  const match = registrationOrNotes.match(/attempts?:(\d+)/i);
   if (match && match[1]) {
     return parseInt(match[1], 10);
   }
@@ -172,7 +186,12 @@ export function parseRegistrationAttempts(notes?: string | null): number {
 }
 
 export function assertCanRegister(
-  existing: { status: RegistrationStatus; notes?: string | null } | null
+  existing: {
+    status: RegistrationStatus;
+    attemptCount?: number | null;
+    withdrawCount?: number | null;
+    notes?: string | null;
+  } | null
 ): void {
   if (!existing) return;
 
@@ -181,9 +200,15 @@ export function assertCanRegister(
     throw new ConflictError("You already have an active registration for this event.");
   }
 
-  // If WITHDRAWN, check attempt limit
-  const attempts = parseRegistrationAttempts(existing.notes);
-  if (attempts >= MAX_REGISTRATION_ATTEMPTS) {
+  // If WITHDRAWN, check attempt limit using real columns with fallback to legacy notes
+  const withdrawCount = existing.withdrawCount ?? 0;
+  const attemptCount =
+    existing.attemptCount ??
+    (existing.notes?.match(/attempts?:(\d+)/i)
+      ? parseInt(existing.notes.match(/attempts?:(\d+)/i)![1], 10)
+      : 1);
+
+  if (withdrawCount >= MAX_REGISTRATION_ATTEMPTS || attemptCount >= MAX_REGISTRATION_ATTEMPTS) {
     throw new AppError(
       "You have reached the maximum limit of 2 registration attempts for this event.",
       "MAX_ATTEMPTS_EXCEEDED",

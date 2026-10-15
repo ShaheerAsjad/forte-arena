@@ -27,7 +27,13 @@ const REGISTRATION_STATUS_STYLES: Record<string, { label: string; className: str
 interface EventRegisterCardProps {
   event: EventWithDerivedStatus<EventDetailItem>;
   isLoggedIn: boolean;
-  existingRegistration?: { id: string; status: string; notes?: string | null } | null;
+  existingRegistration?: {
+    id: string;
+    status: string;
+    attemptCount?: number | null;
+    withdrawCount?: number | null;
+    notes?: string | null;
+  } | null;
 }
 
 export function EventRegisterCard({
@@ -44,7 +50,9 @@ export function EventRegisterCard({
   const loginHref = `/login?next=${encodeURIComponent(registerHref)}`;
 
   const isWithdrawn = existingRegistration?.status === "WITHDRAWN";
-  const attempts = parseRegistrationAttempts(existingRegistration?.notes);
+  const attempts = existingRegistration?.attemptCount ?? parseRegistrationAttempts(existingRegistration?.notes);
+  const withdrawCount = existingRegistration?.withdrawCount ?? 0;
+  const limitReached = isWithdrawn && (withdrawCount >= 2 || attempts >= 2);
 
   // Active registration (PENDING, APPROVED, REJECTED) — show status
   if (existingRegistration && !isWithdrawn) {
@@ -78,7 +86,7 @@ export function EventRegisterCard({
   }
 
   // Withdrawn 2 or more times (attempt limit reached)
-  if (isWithdrawn && attempts >= 2) {
+  if (limitReached) {
     return (
       <Card className="sticky top-24 p-6 sm:p-7 space-y-5 border border-navy-100 shadow-xl bg-white/95 backdrop-blur-md">
         <div className="flex items-center gap-2">

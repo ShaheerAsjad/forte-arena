@@ -162,7 +162,8 @@ export function SiteHeader() {
                       <UserIcon className="w-4 h-4 text-navy-600" />
                       <span>Edit Profile</span>
                     </Link>
-                    {(user as { role?: string })?.role === "ORGANIZER" && (
+                    {((user as { role?: string })?.role === "ORGANIZER" ||
+                      (user as { role?: string })?.role === "ADMIN") && (
                       <Link
                         href="/admin"
                         onClick={() => setProfileMenuOpen(false)}
@@ -258,6 +259,17 @@ export function SiteHeader() {
                       <p className="text-[11px] text-mist truncate">{user.email}</p>
                     </div>
                   </div>
+                  {((user as { role?: string })?.role === "ORGANIZER" ||
+                    (user as { role?: string })?.role === "ADMIN") && (
+                    <Link
+                      href="/admin"
+                      onClick={() => setMobileMenuOpen(false)}
+                      className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-purple-900 text-ivory text-sm font-semibold hover:bg-purple-800 transition shadow-sm"
+                    >
+                      <Shield className="w-4 h-4 text-gold-400" />
+                      <span>Admin Console</span>
+                    </Link>
+                  )}
                   <Link
                     href="/dashboard"
                     onClick={() => setMobileMenuOpen(false)}

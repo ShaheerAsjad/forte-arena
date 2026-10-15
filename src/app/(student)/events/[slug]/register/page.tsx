@@ -95,8 +95,9 @@ async function RegisterInnerContent({ slug }: { slug: string }) {
   // Check existing registration
   const existing = await RegistrationsRepository.findExistingRegistration(event.id, user.id);
   const isWithdrawn = existing?.status === "WITHDRAWN";
-  const attempts = parseRegistrationAttempts(existing?.notes);
-  if (isWithdrawn && attempts >= 2) {
+  const attempts = existing?.attemptCount ?? parseRegistrationAttempts(existing?.notes);
+  const withdrawCount = existing?.withdrawCount ?? 0;
+  if (isWithdrawn && (withdrawCount >= 2 || attempts >= 2)) {
     return (
       <div className="space-y-4">
         <div className="flex items-start gap-3 p-4 rounded-xl bg-danger-bg border border-danger/30">

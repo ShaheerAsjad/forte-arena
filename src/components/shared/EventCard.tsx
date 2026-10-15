@@ -17,8 +17,10 @@ import {
   Clock,
 } from "lucide-react";
 import { CategoryArtwork } from "@/components/shared/CategoryArtwork";
-import type { EventWithDerivedStatus } from "@/features/events/services/events.service";
-import type { EventCardItem } from "@/features/events/repositories/events.repository";
+import type {
+  EventWithDerivedStatus,
+  EventCardItem,
+} from "@/features/events/events.derived";
 import type { EventCategory } from "@/lib/db-types";
 
 export const CATEGORY_META: Record<
