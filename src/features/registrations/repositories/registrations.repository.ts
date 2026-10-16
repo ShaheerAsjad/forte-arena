@@ -25,6 +25,15 @@ export const registrationCardSelect = {
       registrationDeadline: true,
       venue: true,
       posterUrl: true,
+      resultsPublished: true,
+    },
+  },
+  result: {
+    select: {
+      id: true,
+      position: true,
+      award: true,
+      certificateUrl: true,
     },
   },
   team: {
@@ -60,7 +69,14 @@ export type RegistrationCard = {
     registrationDeadline: Date;
     venue: string;
     posterUrl: string | null;
+    resultsPublished: boolean;
   };
+  result?: {
+    id: string;
+    position: number;
+    award: string | null;
+    certificateUrl: string | null;
+  } | null;
   team: {
     id: string;
     name: string;

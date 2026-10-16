@@ -1,9 +1,12 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { createClient } from "@supabase/supabase-js";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import type { ActionResult } from "@/lib/action-result";
+import { isPlaceholderSecretKey } from "./admin.utils";
+import { parseCertificateStoragePath } from "@/features/results/certificates.utils";
 import {
   resultFormSchema,
   type ResultFormValues,
@@ -253,6 +256,46 @@ export async function deleteResultAction(
 
     if (!result) {
       return { ok: false, error: "Result not found." };
+    }
+
+    if (result.certificateUrl) {
+      const storagePath = parseCertificateStoragePath(result.certificateUrl);
+      if (storagePath && storagePath.startsWith("certificates/")) {
+        const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
+        const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
+
+        if (isPlaceholderSecretKey(serviceRoleKey)) {
+          return {
+            ok: false,
+            error:
+              "SUPABASE_SERVICE_ROLE_KEY is not configured or is a placeholder. Please configure a valid secret key for SUPABASE_SERVICE_ROLE_KEY in .env or .env.local.",
+          };
+        }
+
+        if (!supabaseUrl || !supabaseUrl.startsWith("http")) {
+          return {
+            ok: false,
+            error:
+              "NEXT_PUBLIC_SUPABASE_URL is not configured or invalid. Please configure NEXT_PUBLIC_SUPABASE_URL in .env or .env.local.",
+          };
+        }
+
+        const supabase = createClient(supabaseUrl, serviceRoleKey, {
+          auth: {
+            persistSession: false,
+            autoRefreshToken: false,
+          },
+        });
+
+        const bucket = process.env.SUPABASE_STORAGE_BUCKET || "event-media";
+        const { error: removeError } = await supabase.storage.from(bucket).remove([storagePath]);
+        if (removeError) {
+          return {
+            ok: false,
+            error: `Failed to remove certificate storage object: ${removeError.message}`,
+          };
+        }
+      }
     }
 
     await prisma.result.delete({

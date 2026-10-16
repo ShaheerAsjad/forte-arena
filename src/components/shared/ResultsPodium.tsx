@@ -6,13 +6,17 @@ import type { RankedResultItem } from "@/features/results/repositories/results.r
 
 interface ResultsPodiumProps {
   results: RankedResultItem[];
+  eventSlug?: string;
 }
 
-export function ResultsPodium({ results }: ResultsPodiumProps) {
+export function ResultsPodium({ results, eventSlug }: ResultsPodiumProps) {
   const first = results.find((r) => r.position === 1);
   const second = results.find((r) => r.position === 2);
   const third = results.find((r) => r.position === 3);
   const others = results.filter((r) => r.position > 3);
+
+  const getCertificateHref = (resultId: string) =>
+    eventSlug ? `/results/${eventSlug}/certificate/${resultId}` : `#`;
 
   return (
     <div className="space-y-12">
@@ -46,17 +50,13 @@ export function ResultsPodium({ results }: ResultsPodiumProps) {
                     {second.award}
                   </p>
                 )}
-                {second.certificateUrl && (
-                  <Link
-                    href={second.certificateUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="inline-flex items-center gap-1 text-xs text-navy-700 hover:text-navy-900 font-semibold underline underline-offset-2 pt-1"
-                  >
-                    <span>View Certificate</span>
-                    <ExternalLink className="w-3 h-3" />
-                  </Link>
-                )}
+                <Link
+                  href={getCertificateHref(second.id)}
+                  className="inline-flex items-center gap-1 text-xs text-navy-700 hover:text-navy-900 font-semibold underline underline-offset-2 pt-1"
+                >
+                  <span>View Certificate</span>
+                  <ExternalLink className="w-3 h-3" />
+                </Link>
               </Card>
             ) : (
               <div className="hidden md:block w-full h-32 rounded-2xl bg-slate-50/50 border border-dashed border-slate-200" />
@@ -93,17 +93,13 @@ export function ResultsPodium({ results }: ResultsPodiumProps) {
                     {first.award}
                   </p>
                 )}
-                {first.certificateUrl && (
-                  <Link
-                    href={first.certificateUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="inline-flex items-center gap-1 text-xs text-navy-900 hover:text-navy-700 font-bold underline underline-offset-2 pt-1"
-                  >
-                    <span>View Certificate</span>
-                    <ExternalLink className="w-3.5 h-3.5 text-gold-600" />
-                  </Link>
-                )}
+                <Link
+                  href={getCertificateHref(first.id)}
+                  className="inline-flex items-center gap-1 text-xs text-navy-900 hover:text-navy-700 font-bold underline underline-offset-2 pt-1"
+                >
+                  <span>View Certificate</span>
+                  <ExternalLink className="w-3.5 h-3.5 text-gold-600" />
+                </Link>
               </Card>
             ) : null}
             <div className="hidden md:flex w-full h-32 bg-gold-400/90 rounded-b-2xl items-center justify-center font-black font-heading text-4xl text-navy-950 shadow-inner">
@@ -138,17 +134,13 @@ export function ResultsPodium({ results }: ResultsPodiumProps) {
                     {third.award}
                   </p>
                 )}
-                {third.certificateUrl && (
-                  <Link
-                    href={third.certificateUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="inline-flex items-center gap-1 text-xs text-navy-700 hover:text-navy-900 font-semibold underline underline-offset-2 pt-1"
-                  >
-                    <span>View Certificate</span>
-                    <ExternalLink className="w-3 h-3" />
-                  </Link>
-                )}
+                <Link
+                  href={getCertificateHref(third.id)}
+                  className="inline-flex items-center gap-1 text-xs text-navy-700 hover:text-navy-900 font-semibold underline underline-offset-2 pt-1"
+                >
+                  <span>View Certificate</span>
+                  <ExternalLink className="w-3 h-3" />
+                </Link>
               </Card>
             ) : (
               <div className="hidden md:block w-full h-24 rounded-2xl bg-amber-50/40 border border-dashed border-amber-200" />
@@ -198,17 +190,13 @@ export function ResultsPodium({ results }: ResultsPodiumProps) {
                       {r.award}
                     </Badge>
                   )}
-                  {r.certificateUrl && (
-                    <Link
-                      href={r.certificateUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-navy-50 hover:bg-navy-100 text-navy-900 transition-colors"
-                    >
-                      <span>Certificate</span>
-                      <ExternalLink className="w-3 h-3" />
-                    </Link>
-                  )}
+                  <Link
+                    href={getCertificateHref(r.id)}
+                    className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-navy-50 hover:bg-navy-100 text-navy-900 transition-colors"
+                  >
+                    <span>View Certificate</span>
+                    <ExternalLink className="w-3 h-3" />
+                  </Link>
                 </div>
               </div>
             ))}

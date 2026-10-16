@@ -149,8 +149,11 @@ async function AdminResultsListContent() {
                     <div className="font-heading text-lg font-black text-navy-950">
                       {ev.resultCount}
                     </div>
-                    <span className="text-[11px] font-medium text-mist">
+                    <span className="text-[11px] font-medium text-mist block">
                       {ev.resultCount === 1 ? "Result Entered" : "Results Entered"}
+                    </span>
+                    <span className="text-[11px] font-semibold text-gold-700 block mt-0.5">
+                      {ev.certificatesUploadedCount} of {ev.resultCount} certificates uploaded
                     </span>
                   </div>
 

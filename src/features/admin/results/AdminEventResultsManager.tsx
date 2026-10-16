@@ -2,6 +2,7 @@
 
 import React, { useState, useTransition } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { toast } from "sonner";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
@@ -17,6 +18,10 @@ import {
   unpublishResultsAction,
   markEventCompletedAction,
 } from "@/features/admin/results.actions";
+import {
+  uploadCertificateAction,
+  removeCertificateAction,
+} from "@/features/admin/certificates.actions";
 import {
   AWARD_PRESETS,
   validateRankUniqueness,
@@ -40,6 +45,9 @@ import {
   AlertTriangle,
   Sparkles,
   ExternalLink,
+  Upload,
+  Award,
+  Loader2,
 } from "lucide-react";
 
 interface AdminEventResultsManagerProps {
@@ -87,6 +95,11 @@ export function AdminEventResultsManager({
   const [isPublishing, setIsPublishing] = useState<boolean>(false);
   const [isBulkAdding, setIsBulkAdding] = useState<boolean>(false);
   const [activeTab, setActiveTab] = useState<"editor" | "preview">("editor");
+
+  // Certificate upload & removal state per result row
+  const [uploadingCertId, setUploadingCertId] = useState<string | null>(null);
+  const [removingCertId, setRemovingCertId] = useState<string | null>(null);
+  const [certErrors, setCertErrors] = useState<Record<string, string>>({});
 
   // Filter approved participants who do not yet have a result
   const registeredIdsWithResults = new Set(
@@ -354,6 +367,88 @@ export function AdminEventResultsManager({
     }
   };
 
+  const handleCertificateUpload = async (
+    resultId: string,
+    e: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Reset input value so the same file could be selected again if needed
+    e.target.value = "";
+
+    // Clear previous error for this result
+    setCertErrors((prev) => {
+      const next = { ...prev };
+      delete next[resultId];
+      return next;
+    });
+
+    if (file.size > 3 * 1024 * 1024) {
+      const errorMsg = `File size (${(file.size / (1024 * 1024)).toFixed(2)} MB) exceeds the 3 MB limit for certificates.`;
+      setCertErrors((prev) => ({ ...prev, [resultId]: errorMsg }));
+      toast.error(errorMsg);
+      return;
+    }
+
+    setUploadingCertId(resultId);
+    const formData = new FormData();
+    formData.append("file", file);
+
+    try {
+      const response = await uploadCertificateAction(resultId, event.id, formData);
+      if (!response.ok) {
+        setCertErrors((prev) => ({ ...prev, [resultId]: response.error }));
+        toast.error(response.error);
+      } else {
+        toast.success("Certificate uploaded successfully");
+        setResults((prev) =>
+          prev.map((r) =>
+            r.id === resultId ? { ...r, certificateUrl: response.data.certificateUrl } : r
+          )
+        );
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Upload failed";
+      setCertErrors((prev) => ({ ...prev, [resultId]: msg }));
+      toast.error(msg);
+    } finally {
+      setUploadingCertId(null);
+    }
+  };
+
+  const handleCertificateRemove = async (resultId: string) => {
+    if (!window.confirm("Remove this certificate image? The storage file will also be deleted.")) {
+      return;
+    }
+
+    setCertErrors((prev) => {
+      const next = { ...prev };
+      delete next[resultId];
+      return next;
+    });
+
+    setRemovingCertId(resultId);
+    try {
+      const response = await removeCertificateAction(resultId, event.id);
+      if (!response.ok) {
+        setCertErrors((prev) => ({ ...prev, [resultId]: response.error }));
+        toast.error(response.error);
+      } else {
+        toast.success("Certificate removed");
+        setResults((prev) =>
+          prev.map((r) => (r.id === resultId ? { ...r, certificateUrl: null } : r))
+        );
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Removal failed";
+      setCertErrors((prev) => ({ ...prev, [resultId]: msg }));
+      toast.error(msg);
+    } finally {
+      setRemovingCertId(null);
+    }
+  };
+
   const handleMarkCompleted = async () => {
     try {
       const res = await markEventCompletedAction(event.id);
@@ -548,7 +643,7 @@ export function AdminEventResultsManager({
             </Card>
           ) : (
             <div className="p-6 sm:p-10 rounded-3xl bg-white border border-navy-100 shadow-sm">
-              <ResultsPodium results={previewResults} />
+              <ResultsPodium results={previewResults} eventSlug={event.slug} />
             </div>
           )}
         </div>
@@ -812,64 +907,202 @@ export function AdminEventResultsManager({
                   return (
                     <Card
                       key={res.id}
-                      className="p-4 bg-white border border-navy-100 hover:border-gold-300 transition-colors shadow-xs rounded-xl flex items-center justify-between gap-3"
+                      className="p-4 bg-white border border-navy-100 hover:border-gold-300 transition-colors shadow-xs rounded-xl space-y-3"
                     >
-                      <div className="flex items-center gap-3.5 min-w-0">
-                        {/* Rank Badge */}
-                        <div
-                          className={`w-9 h-9 rounded-xl flex items-center justify-center font-heading font-black text-sm shrink-0 shadow-2xs ${rankBadgeColor}`}
-                        >
-                          #{res.position}
+                      {/* Top Row: Rank, Participant & Result details */}
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-3.5 min-w-0">
+                          {/* Rank Badge */}
+                          <div
+                            className={`w-9 h-9 rounded-xl flex items-center justify-center font-heading font-black text-sm shrink-0 shadow-2xs ${rankBadgeColor}`}
+                          >
+                            #{res.position}
+                          </div>
+
+                          {/* Participant & Award info */}
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2">
+                              <span className="font-heading font-extrabold text-sm text-navy-950 truncate">
+                                {res.participantName}
+                              </span>
+                              {res.isTie && (
+                                <span className="text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-300 px-1.5 py-0.2 rounded">
+                                  TIE
+                                </span>
+                              )}
+                            </div>
+
+                            <div className="flex flex-wrap items-center gap-2 text-xs text-mist pt-0.5">
+                              <span className="font-semibold text-navy-800">
+                                {res.award || "Award"}
+                              </span>
+                              {res.score && (
+                                <span>• Score: <strong className="font-mono text-navy-900">{res.score}</strong></span>
+                              )}
+                              {res.remarks && (
+                                <span className="italic truncate max-w-[200px]">
+                                  • &ldquo;{res.remarks}&rdquo;
+                                </span>
+                              )}
+                            </div>
+                          </div>
                         </div>
 
-                        {/* Participant & Award info */}
-                        <div className="min-w-0">
-                          <div className="flex items-center gap-2">
-                            <span className="font-heading font-extrabold text-sm text-navy-950 truncate">
-                              {res.participantName}
-                            </span>
-                            {res.isTie && (
-                              <span className="text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-300 px-1.5 py-0.2 rounded">
-                                TIE
-                              </span>
-                            )}
-                          </div>
-
-                          <div className="flex flex-wrap items-center gap-2 text-xs text-mist pt-0.5">
-                            <span className="font-semibold text-navy-800">
-                              {res.award || "Award"}
-                            </span>
-                            {res.score && (
-                              <span>• Score: <strong className="font-mono text-navy-900">{res.score}</strong></span>
-                            )}
-                            {res.remarks && (
-                              <span className="italic truncate max-w-[200px]">
-                                • &ldquo;{res.remarks}&rdquo;
-                              </span>
-                            )}
-                          </div>
+                        {/* Edit / Delete Result */}
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => handleEditClick(res)}
+                            title="Edit Result"
+                            className="p-1.5 rounded-lg text-mist hover:text-navy-950 hover:bg-navy-50 transition-colors"
+                          >
+                            <Edit2 className="w-4 h-4" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDelete(res.id)}
+                            title="Delete Result"
+                            className="p-1.5 rounded-lg text-mist hover:text-danger hover:bg-rose-50 transition-colors"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
                         </div>
                       </div>
 
-                      {/* Row actions */}
-                      <div className="flex items-center gap-1.5 shrink-0">
-                        <button
-                          type="button"
-                          onClick={() => handleEditClick(res)}
-                          title="Edit Result"
-                          className="p-1.5 rounded-lg text-mist hover:text-navy-950 hover:bg-navy-50 transition-colors"
-                        >
-                          <Edit2 className="w-4 h-4" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleDelete(res.id)}
-                          title="Delete Result"
-                          className="p-1.5 rounded-lg text-mist hover:text-danger hover:bg-rose-50 transition-colors"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
+                      {/* Bottom Row: Certificate Management Area */}
+                      <div className="pt-2.5 border-t border-navy-50 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-navy-50/50 p-2.5 rounded-lg">
+                        <div className="flex items-center gap-3">
+                          {/* Thumbnail preview */}
+                          {res.certificateUrl ? (
+                            <a
+                              href={res.certificateUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="relative group w-14 h-10 rounded-md overflow-hidden border border-navy-200 bg-slate-100 shrink-0 shadow-2xs block"
+                              title="Click to preview certificate image"
+                            >
+                              <Image
+                                src={res.certificateUrl}
+                                alt={`Certificate for ${res.participantName}`}
+                                fill
+                                sizes="56px"
+                                className="object-cover group-hover:scale-105 transition-transform"
+                              />
+                            </a>
+                          ) : (
+                            <div className="w-14 h-10 rounded-md border border-dashed border-navy-200 bg-white flex items-center justify-center text-mist shrink-0">
+                              <Award className="w-4 h-4 text-navy-300" />
+                            </div>
+                          )}
+
+                          {/* Status Badge */}
+                          <div className="space-y-0.5">
+                            <div className="flex items-center gap-1.5">
+                              {res.certificateUrl ? (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                                  <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                                  <span>Uploaded</span>
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-600 border border-slate-200">
+                                  <span>Missing</span>
+                                </span>
+                              )}
+                              <span className="text-[11px] font-medium text-mist">
+                                {res.certificateUrl ? "Certificate image attached" : "No certificate uploaded"}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Action buttons with loading states */}
+                        <div className="flex items-center gap-2 self-end sm:self-center">
+                          {/* Hidden file input */}
+                          <input
+                            type="file"
+                            id={`cert-upload-${res.id}`}
+                            accept=".png,.jpg,.jpeg,.webp"
+                            className="hidden"
+                            disabled={uploadingCertId === res.id || removingCertId === res.id}
+                            onChange={(e) => handleCertificateUpload(res.id, e)}
+                          />
+
+                          {res.certificateUrl ? (
+                            <>
+                              <label
+                                htmlFor={`cert-upload-${res.id}`}
+                                className={`inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded-lg border border-navy-200 bg-white hover:bg-navy-50 text-navy-950 transition-colors shadow-2xs cursor-pointer ${
+                                  uploadingCertId === res.id || removingCertId === res.id
+                                    ? "opacity-50 pointer-events-none"
+                                    : ""
+                                }`}
+                              >
+                                {uploadingCertId === res.id ? (
+                                  <>
+                                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                    <span>Replacing...</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <Upload className="w-3.5 h-3.5 text-navy-700" />
+                                    <span>Replace</span>
+                                  </>
+                                )}
+                              </label>
+
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                className="text-danger hover:text-danger hover:bg-rose-50 text-xs px-2.5 py-1 h-auto"
+                                disabled={uploadingCertId === res.id || removingCertId === res.id}
+                                onClick={() => handleCertificateRemove(res.id)}
+                              >
+                                {removingCertId === res.id ? (
+                                  <>
+                                    <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" />
+                                    <span>Removing...</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <Trash2 className="w-3.5 h-3.5 mr-1" />
+                                    <span>Remove</span>
+                                  </>
+                                )}
+                              </Button>
+                            </>
+                          ) : (
+                            <label
+                              htmlFor={`cert-upload-${res.id}`}
+                              className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg bg-navy-950 hover:bg-navy-900 text-ivory transition-colors shadow-2xs cursor-pointer ${
+                                uploadingCertId === res.id || removingCertId === res.id
+                                  ? "opacity-50 pointer-events-none"
+                                  : ""
+                              }`}
+                            >
+                              {uploadingCertId === res.id ? (
+                                <>
+                                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                  <span>Uploading...</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Upload className="w-3.5 h-3.5 text-gold-400" />
+                                  <span>Upload</span>
+                                </>
+                              )}
+                            </label>
+                          )}
+                        </div>
                       </div>
+
+                      {/* Error state alert */}
+                      {certErrors[res.id] && (
+                        <div className="p-2 rounded-lg bg-danger-bg border border-danger/20 text-danger text-xs font-medium flex items-start gap-1.5">
+                          <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                          <span>{certErrors[res.id]}</span>
+                        </div>
+                      )}
                     </Card>
                   );
                 })}

@@ -117,7 +117,7 @@ async function EventResultsLoader({ params }: EventResultsPageProps) {
       </div>
 
       {/* Podium & Full Standings */}
-      <ResultsPodium results={event.results} />
+      <ResultsPodium results={event.results} eventSlug={event.slug} />
     </div>
   );
 }

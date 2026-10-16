@@ -66,6 +66,7 @@ export type AdminEventResultRow = {
   resultsPublished: boolean;
   resultCount: number;
   approvedCount: number;
+  certificatesUploadedCount: number;
   statusBadge: "NO_RESULTS" | "DRAFT" | "PUBLISHED";
 };
 
@@ -285,6 +286,11 @@ export class ResultsRepository {
         endsAt: true,
         venue: true,
         resultsPublished: true,
+        results: {
+          select: {
+            certificateUrl: true,
+          },
+        },
         _count: {
           select: {
             results: true,
@@ -305,6 +311,10 @@ export class ResultsRepository {
         statusBadge = "DRAFT";
       }
 
+      const certificatesUploadedCount = ev.results.filter(
+        (r) => r.certificateUrl !== null && r.certificateUrl !== ""
+      ).length;
+
       return {
         id: ev.id,
         slug: ev.slug,
@@ -318,6 +328,7 @@ export class ResultsRepository {
         resultsPublished: ev.resultsPublished,
         resultCount: ev._count.results,
         approvedCount: ev._count.registrations,
+        certificatesUploadedCount,
         statusBadge,
       };
     });
@@ -439,4 +450,103 @@ export class ResultsRepository {
       approvedRegistrations: formattedApproved,
     };
   }
+
+  /**
+   * Fetch certificate view data for a specific competition result.
+   * Returns null if not found, wrong event slug, or results not published.
+   */
+  static async getCertificateData(
+    slug: string,
+    resultId: string
+  ): Promise<CertificateDetail | null> {
+    await connection();
+    const result = await prisma.result.findUnique({
+      where: { id: resultId },
+      select: {
+        id: true,
+        position: true,
+        award: true,
+        score: true,
+        remarks: true,
+        certificateUrl: true,
+        isTie: true,
+        customParticipantName: true,
+        event: {
+          select: {
+            id: true,
+            slug: true,
+            title: true,
+            category: true,
+            startsAt: true,
+            venue: true,
+            resultsPublished: true,
+          },
+        },
+        registration: {
+          select: {
+            user: {
+              select: {
+                name: true,
+                rollNumber: true,
+                department: true,
+              },
+            },
+            team: {
+              select: {
+                name: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!result || result.event.slug !== slug || !result.event.resultsPublished) {
+      return null;
+    }
+
+    const participantName =
+      result.registration?.team?.name ??
+      result.registration?.user?.name ??
+      result.customParticipantName ??
+      "Participant";
+
+    return {
+      id: result.id,
+      position: result.position,
+      award: result.award,
+      score: result.score,
+      remarks: result.remarks,
+      certificateUrl: result.certificateUrl,
+      isTie: result.isTie,
+      participantName,
+      teamName: result.registration?.team?.name ?? null,
+      department: result.registration?.user?.department ?? null,
+      rollNumber: result.registration?.user?.rollNumber ?? null,
+      event: result.event,
+    };
+  }
 }
+
+export type CertificateDetail = {
+  id: string;
+  position: number;
+  award: string | null;
+  score: string | null;
+  remarks: string | null;
+  certificateUrl: string | null;
+  isTie: boolean;
+  participantName: string;
+  teamName: string | null;
+  department: string | null;
+  rollNumber: string | null;
+  event: {
+    id: string;
+    slug: string;
+    title: string;
+    category: EventCategory;
+    startsAt: Date;
+    venue: string;
+    resultsPublished: boolean;
+  };
+};

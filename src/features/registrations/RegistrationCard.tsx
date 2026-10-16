@@ -158,6 +158,32 @@ export function RegistrationCard({ registration }: RegistrationCardProps) {
       {/* Timeline */}
       <StatusTimeline status={status} />
 
+      {/* Published Result & Certificate */}
+      {event.resultsPublished && registration.result && (
+        <div className="p-3 rounded-xl bg-gold-50/70 border border-gold-200/80 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="w-8 h-8 rounded-lg bg-gold-400 text-navy-950 flex items-center justify-center font-heading font-black text-xs shrink-0 shadow-2xs">
+              #{registration.result.position}
+            </div>
+            <div className="min-w-0">
+              <p className="text-xs font-extrabold text-navy-950 truncate">
+                Position #{registration.result.position}
+                {registration.result.award ? ` (${registration.result.award})` : ""}
+              </p>
+              <p className="text-[10px] text-mist">Official Event Result</p>
+            </div>
+          </div>
+
+          <Link
+            href={`/results/${event.slug}/certificate/${registration.result.id}`}
+            className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-bold rounded-lg bg-navy-950 hover:bg-navy-900 text-ivory transition-colors shadow-2xs shrink-0"
+          >
+            <span>View Certificate</span>
+            <ArrowUpRight className="w-3.5 h-3.5 text-gold-400" />
+          </Link>
+        </div>
+      )}
+
       {/* Footer */}
       <div className="flex items-center justify-between pt-2 border-t border-navy-50">
         <p className="text-[10px] text-mist">
