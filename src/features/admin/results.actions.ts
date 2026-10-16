@@ -11,8 +11,14 @@ import {
   resultFormSchema,
   type ResultFormValues,
   validateRankUniqueness,
+  validateParticipantUniqueness,
+  validateAwardForPosition,
+  validateQuickPodiumPayload,
+  validateBatchAwardPayload,
   validateEventPublishability,
+  type QuickPodiumPayload,
   type ExistingResultItem,
+  getAutomaticAwardForPosition,
 } from "@/features/results/results.rules";
 
 async function revalidateResultsPaths(eventSlug?: string, eventId?: string) {
@@ -25,6 +31,21 @@ async function revalidateResultsPaths(eventSlug?: string, eventId?: string) {
     revalidatePath(`/results/${eventSlug}`);
   }
   revalidatePath("/");
+}
+
+function mapPrismaError(err: unknown, defaultMessage: string): string {
+  if (err && typeof err === "object" && "code" in err && (err as { code: string }).code === "P2002") {
+    const meta = (err as { meta?: { target?: string[] | string } }).meta;
+    const targetStr = String(meta?.target || "");
+    if (targetStr.includes("position") || targetStr.includes("podium")) {
+      return "1st, 2nd, and 3rd Places are unique per event. This podium position is already taken.";
+    }
+    if (targetStr.includes("registrationId")) {
+      return "This participant already has a result recorded for this event.";
+    }
+    return "A unique constraint conflict occurred. Please verify rankings and participants.";
+  }
+  return err instanceof Error ? err.message : defaultMessage;
 }
 
 /**
@@ -56,13 +77,12 @@ export async function addResultAction(
       return { ok: false, error: "Event not found." };
     }
 
-    // Fetch existing results for rank uniqueness validation
+    // Fetch existing results for rank and participant uniqueness validation
     const existingRows = await prisma.result.findMany({
       where: { eventId: data.eventId },
       select: {
         id: true,
         position: true,
-        isTie: true,
         registrationId: true,
         customParticipantName: true,
         registration: {
@@ -74,25 +94,11 @@ export async function addResultAction(
       },
     });
 
-    // Check if the registered participant already has a result
-    if (data.participantType === "REGISTERED" && data.registrationId) {
-      const alreadyHasResult = existingRows.find(
-        (r) => r.registrationId === data.registrationId
-      );
-      if (alreadyHasResult) {
-        return {
-          ok: false,
-          error: "This participant or team already has a result recorded for this event.",
-        };
-      }
-    }
-
-    // Validate rank uniqueness (ranks 1 to 3 must be unique unless tie is ticked)
     const existingItems: ExistingResultItem[] = existingRows.map((r) => ({
       id: r.id,
       position: r.position,
-      isTie: r.isTie,
       registrationId: r.registrationId,
+      customParticipantName: r.customParticipantName,
       participantName:
         r.registration?.team?.name ??
         r.registration?.user?.name ??
@@ -100,9 +106,28 @@ export async function addResultAction(
         "Participant",
     }));
 
-    const rankValidation = validateRankUniqueness(data.position, data.isTie, existingItems);
+    // 1. One result per participant
+    const participantValidation = validateParticipantUniqueness(
+      data.participantType,
+      data.registrationId,
+      data.customParticipantName,
+      existingItems
+    );
+    if (!participantValidation.valid) {
+      return { ok: false, error: participantValidation.error || "Duplicate participant." };
+    }
+
+    // 2. Positions 1, 2, and 3 are unique per event (no exceptions)
+    const rankValidation = validateRankUniqueness(data.position, existingItems);
     if (!rankValidation.valid) {
       return { ok: false, error: rankValidation.error || "Invalid position ranking." };
+    }
+
+    // 3. Award title: automatic for 1..3, flexible for 4+
+    const finalAward = getAutomaticAwardForPosition(data.position) || data.award.trim();
+    const awardValidation = validateAwardForPosition(data.position, finalAward);
+    if (!awardValidation.valid) {
+      return { ok: false, error: awardValidation.error || "Invalid award label." };
     }
 
     const created = await prisma.result.create({
@@ -113,12 +138,14 @@ export async function addResultAction(
             ? data.registrationId
             : null,
         customParticipantName:
-          data.participantType === "WALKIN" ? data.customParticipantName : null,
+          data.participantType === "WALKIN" && data.customParticipantName
+            ? data.customParticipantName.trim()
+            : null,
         position: data.position,
-        award: data.award,
-        score: data.score || null,
-        remarks: data.remarks || null,
-        isTie: data.isTie,
+        award: finalAward,
+        score: data.score ? data.score.trim() : null,
+        remarks: data.remarks ? data.remarks.trim() : null,
+        isTie: false,
       },
     });
 
@@ -127,7 +154,7 @@ export async function addResultAction(
     return { ok: true, data: { id: created.id } };
   } catch (err) {
     console.error("addResultAction error:", err);
-    return { ok: false, error: "Failed to record result. Please check inputs and retry." };
+    return { ok: false, error: mapPrismaError(err, "Failed to record result. Please check inputs and retry.") };
   }
 }
 
@@ -160,13 +187,12 @@ export async function updateResultAction(
       return { ok: false, error: "Result not found." };
     }
 
-    // Fetch existing results excluding the one being edited
+    // Fetch existing results for this event
     const otherRows = await prisma.result.findMany({
-      where: { eventId: existingResult.eventId, id: { not: resultId } },
+      where: { eventId: existingResult.eventId },
       select: {
         id: true,
         position: true,
-        isTie: true,
         registrationId: true,
         customParticipantName: true,
         registration: {
@@ -178,24 +204,11 @@ export async function updateResultAction(
       },
     });
 
-    // Check duplicate participant
-    if (data.participantType === "REGISTERED" && data.registrationId) {
-      const alreadyHasResult = otherRows.find(
-        (r) => r.registrationId === data.registrationId
-      );
-      if (alreadyHasResult) {
-        return {
-          ok: false,
-          error: "This participant already has another result recorded for this event.",
-        };
-      }
-    }
-
     const existingItems: ExistingResultItem[] = otherRows.map((r) => ({
       id: r.id,
       position: r.position,
-      isTie: r.isTie,
       registrationId: r.registrationId,
+      customParticipantName: r.customParticipantName,
       participantName:
         r.registration?.team?.name ??
         r.registration?.user?.name ??
@@ -203,14 +216,33 @@ export async function updateResultAction(
         "Participant",
     }));
 
+    // 1. Participant uniqueness check
+    const participantValidation = validateParticipantUniqueness(
+      data.participantType,
+      data.registrationId,
+      data.customParticipantName,
+      existingItems,
+      resultId
+    );
+    if (!participantValidation.valid) {
+      return { ok: false, error: participantValidation.error || "Duplicate participant." };
+    }
+
+    // 2. Rank uniqueness check
     const rankValidation = validateRankUniqueness(
       data.position,
-      data.isTie,
       existingItems,
       resultId
     );
     if (!rankValidation.valid) {
       return { ok: false, error: rankValidation.error || "Invalid position ranking." };
+    }
+
+    // 3. Award title validation
+    const finalAward = getAutomaticAwardForPosition(data.position) || data.award.trim();
+    const awardValidation = validateAwardForPosition(data.position, finalAward);
+    if (!awardValidation.valid) {
+      return { ok: false, error: awardValidation.error || "Invalid award label." };
     }
 
     const updated = await prisma.result.update({
@@ -221,12 +253,14 @@ export async function updateResultAction(
             ? data.registrationId
             : null,
         customParticipantName:
-          data.participantType === "WALKIN" ? data.customParticipantName : null,
+          data.participantType === "WALKIN" && data.customParticipantName
+            ? data.customParticipantName.trim()
+            : null,
         position: data.position,
-        award: data.award,
-        score: data.score || null,
-        remarks: data.remarks || null,
-        isTie: data.isTie,
+        award: finalAward,
+        score: data.score ? data.score.trim() : null,
+        remarks: data.remarks ? data.remarks.trim() : null,
+        isTie: false,
       },
     });
 
@@ -235,7 +269,7 @@ export async function updateResultAction(
     return { ok: true, data: { id: updated.id } };
   } catch (err) {
     console.error("updateResultAction error:", err);
-    return { ok: false, error: "Failed to update result." };
+    return { ok: false, error: mapPrismaError(err, "Failed to update result.") };
   }
 }
 
@@ -312,11 +346,106 @@ export async function deleteResultAction(
 }
 
 /**
- * Batch add all approved participants as Participation.
- * Skips anyone already listed in the event's results.
+ * Quick Podium form:
+ * Sets 1st, 2nd, and/or 3rd places in ONE transaction.
+ * Rejects duplicate participants across slots; any slot may stay empty.
  */
-export async function addAllApprovedAsParticipationAction(
-  eventId: string
+export async function addQuickPodiumAction(
+  payload: QuickPodiumPayload
+): Promise<ActionResult<{ savedCount: number }>> {
+  try {
+    await requireRole(["ORGANIZER", "ADMIN"]);
+
+    const event = await prisma.event.findUnique({
+      where: { id: payload.eventId },
+      select: { id: true, slug: true },
+    });
+
+    if (!event) {
+      return { ok: false, error: "Event not found." };
+    }
+
+    // Fetch existing results for this event
+    const existingRows = await prisma.result.findMany({
+      where: { eventId: payload.eventId },
+      select: {
+        id: true,
+        position: true,
+        registrationId: true,
+        customParticipantName: true,
+        registration: {
+          select: {
+            user: { select: { name: true } },
+            team: { select: { name: true } },
+          },
+        },
+      },
+    });
+
+    const existingItems: ExistingResultItem[] = existingRows.map((r) => ({
+      id: r.id,
+      position: r.position,
+      registrationId: r.registrationId,
+      customParticipantName: r.customParticipantName,
+      participantName:
+        r.registration?.team?.name ??
+        r.registration?.user?.name ??
+        r.customParticipantName ??
+        "Participant",
+    }));
+
+    const validation = validateQuickPodiumPayload(payload, existingItems);
+    if (!validation.valid) {
+      return { ok: false, error: validation.error || "Invalid podium selection." };
+    }
+
+    const slotsToInsert = [
+      { pos: 1, award: "Champion", slot: payload.first },
+      { pos: 2, award: "Runner-up", slot: payload.second },
+      { pos: 3, award: "Second Runner-up", slot: payload.third },
+    ].filter((item) => Boolean(item.slot));
+
+    // Save all chosen podium slots in ONE transaction
+    await prisma.$transaction(
+      slotsToInsert.map((item) =>
+        prisma.result.create({
+          data: {
+            eventId: payload.eventId,
+            position: item.pos,
+            award: item.award,
+            registrationId:
+              item.slot?.participantType === "REGISTERED" && item.slot.registrationId
+                ? item.slot.registrationId
+                : null,
+            customParticipantName:
+              item.slot?.participantType === "WALKIN" && item.slot.customParticipantName
+                ? item.slot.customParticipantName.trim()
+                : null,
+            isTie: false,
+          },
+        })
+      )
+    );
+
+    await revalidateResultsPaths(event.slug, event.id);
+
+    return { ok: true, data: { savedCount: slotsToInsert.length } };
+  } catch (err) {
+    console.error("addQuickPodiumAction error:", err);
+    return { ok: false, error: mapPrismaError(err, "Failed to record quick podium standings.") };
+  }
+}
+
+/**
+ * Add several participants with the same award:
+ * The organizer manually ticks several approved participants and gives them
+ * one award (Honorable Mention or Participation), saved in one transaction.
+ */
+export async function addBatchAwardAction(
+  eventId: string,
+  registrationIds: string[],
+  award: "Honorable Mention" | "Participation",
+  startingPosition?: number
 ): Promise<ActionResult<{ addedCount: number }>> {
   try {
     await requireRole(["ORGANIZER", "ADMIN"]);
@@ -330,49 +459,59 @@ export async function addAllApprovedAsParticipationAction(
       return { ok: false, error: "Event not found." };
     }
 
-    // Get current results and all approved registrations
-    const [existingResults, approvedRegistrations] = await Promise.all([
-      prisma.result.findMany({
-        where: { eventId },
-        select: { registrationId: true, position: true },
-      }),
-      prisma.registration.findMany({
-        where: { eventId, status: "APPROVED" },
-        select: { id: true },
-      }),
-    ]);
+    // Get current results
+    const existingRows = await prisma.result.findMany({
+      where: { eventId },
+      select: {
+        id: true,
+        position: true,
+        registrationId: true,
+        customParticipantName: true,
+        registration: {
+          select: {
+            user: { select: { name: true } },
+            team: { select: { name: true } },
+          },
+        },
+      },
+    });
 
-    const existingRegIds = new Set(
-      existingResults
-        .map((r) => r.registrationId)
-        .filter((id): id is string => Boolean(id))
+    const existingItems: ExistingResultItem[] = existingRows.map((r) => ({
+      id: r.id,
+      position: r.position,
+      registrationId: r.registrationId,
+      customParticipantName: r.customParticipantName,
+      participantName:
+        r.registration?.team?.name ??
+        r.registration?.user?.name ??
+        r.customParticipantName ??
+        "Participant",
+    }));
+
+    // Auto-calculate position: after podium (at least 4)
+    const currentMax = existingRows.reduce((max, r) => Math.max(max, r.position), 3);
+    const assignedPosition = startingPosition && startingPosition >= 4 ? startingPosition : currentMax + 1;
+
+    const validation = validateBatchAwardPayload(
+      registrationIds,
+      award,
+      assignedPosition,
+      existingItems
     );
-
-    const pendingRegistrations = approvedRegistrations.filter(
-      (reg) => !existingRegIds.has(reg.id)
-    );
-
-    if (pendingRegistrations.length === 0) {
-      return {
-        ok: true,
-        data: { addedCount: 0 },
-      };
+    if (!validation.valid) {
+      return { ok: false, error: validation.error || "Invalid batch award inputs." };
     }
 
-    // Determine position: after podium (at least 4)
-    const maxPosition = existingResults.reduce((max, r) => Math.max(max, r.position), 3);
-    const participationPosition = maxPosition + 1;
-
-    // Create results with award="Participation" and isTie=true
+    // Save in one transaction
     await prisma.$transaction(
-      pendingRegistrations.map((reg) =>
+      registrationIds.map((regId) =>
         prisma.result.create({
           data: {
             eventId,
-            registrationId: reg.id,
-            position: participationPosition,
-            award: "Participation",
-            isTie: true,
+            registrationId: regId,
+            position: assignedPosition,
+            award,
+            isTie: false,
           },
         })
       )
@@ -380,13 +519,10 @@ export async function addAllApprovedAsParticipationAction(
 
     await revalidateResultsPaths(event.slug, event.id);
 
-    return {
-      ok: true,
-      data: { addedCount: pendingRegistrations.length },
-    };
+    return { ok: true, data: { addedCount: registrationIds.length } };
   } catch (err) {
-    console.error("addAllApprovedAsParticipationAction error:", err);
-    return { ok: false, error: "Failed to add participation results." };
+    console.error("addBatchAwardAction error:", err);
+    return { ok: false, error: mapPrismaError(err, "Failed to save batch awards.") };
   }
 }
 

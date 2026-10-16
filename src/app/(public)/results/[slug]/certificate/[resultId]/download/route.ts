@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { buildContentDispositionHeader } from "@/features/results/certificates.utils";
 
 export async function GET(
   _req: Request,
@@ -75,18 +76,12 @@ export async function GET(
   const contentType = upstreamResponse.headers.get("content-type") || "image/png";
   const arrayBuffer = await upstreamResponse.arrayBuffer();
 
-  // 4. Determine clean file name
+  // 4. Determine clean file name and build safe Content-Disposition
   const participant =
     result.registration?.team?.name ||
     result.registration?.user?.name ||
     result.customParticipantName ||
     "participant";
-
-  const sanitizedParticipant = participant
-    .toLowerCase()
-    .replace(/[^a-z0-9_-]/g, "_")
-    .replace(/_+/g, "_")
-    .replace(/^_+|_+$/g, "");
 
   let ext = "png";
   if (contentType.includes("jpeg") || contentType.includes("jpg")) {
@@ -94,21 +89,21 @@ export async function GET(
   } else if (contentType.includes("webp")) {
     ext = "webp";
   } else {
-    // Try to extract from URL if possible
     const match = result.certificateUrl.match(/\.(png|jpg|jpeg|webp)(?:\?.*)?$/i);
     if (match?.[1]) {
       ext = match[1].toLowerCase() === "jpeg" ? "jpg" : match[1].toLowerCase();
     }
   }
 
-  const filename = `certificate-${slug}-${sanitizedParticipant || "award"}.${ext}`;
+  const rawFilename = `certificate-${slug}-${participant.trim()}.${ext}`;
+  const contentDisposition = buildContentDispositionHeader(rawFilename);
 
   // 5. Return same-origin attachment response
   return new Response(arrayBuffer, {
     status: 200,
     headers: {
       "Content-Type": contentType,
-      "Content-Disposition": `attachment; filename="${filename}"`,
+      "Content-Disposition": contentDisposition,
       "Content-Length": arrayBuffer.byteLength.toString(),
       "Cache-Control": "private, no-cache, no-store, must-revalidate",
     },

@@ -164,3 +164,59 @@ export function parseCertificateStoragePath(rawUrl: string): string | null {
     return null;
   }
 }
+
+/**
+ * Builds a safe ASCII-only fallback filename.
+ * Strips quotes, CRLF/newlines, backslashes, control characters, and non-ASCII chars.
+ * Limits the length to avoid legacy browser header overflows.
+ */
+export function sanitizeAsciiFilename(name: string, fallback: string = "certificate.png"): string {
+  // Extract extension if present
+  const extMatch = name.match(/\.([a-zA-Z0-9]+)$/);
+  const ext = extMatch ? `.${extMatch[1]}` : "";
+  const nameWithoutExt = extMatch ? name.slice(0, -ext.length) : name;
+
+  // Remove control characters, newlines, quotes, backslashes, semicolons
+  let clean = nameWithoutExt.replace(/[\r\n\t"'\\]/g, "");
+  // Replace dangerous filesystem characters with hyphens
+  clean = clean.replace(/[<>:;/|?*]/g, "-");
+  // Replace non-ASCII characters with hyphens or strip
+  clean = clean.replace(/[^\x20-\x7E]/g, "").trim();
+  // Collapse whitespace
+  clean = clean.replace(/\s+/g, "_").replace(/-+/g, "-").replace(/_+/g, "_");
+
+  // If empty after stripping (e.g. pure Urdu or non-ASCII name), use fallback
+  if (!clean || clean === "_" || clean === "-") {
+    return fallback;
+  }
+
+  // Limit length of base filename to 60 characters
+  const truncated = clean.slice(0, 60);
+  return `${truncated}${ext}`;
+}
+
+/**
+ * Safely constructs a Content-Disposition header supporting both:
+ * 1. ASCII-only fallback filename (quotes stripped, CRLF removed, non-ASCII stripped)
+ * 2. RFC 5987 / RFC 6266 filename*=UTF-8''<percent-encoded full name>
+ *
+ * Ensures names in Urdu script or containing quotes/linebreaks never throw or break downloads.
+ */
+export function buildContentDispositionHeader(rawFilename: string): string {
+  // Strip linebreaks to completely prevent HTTP response header injection (CRLF splitting)
+  const singleLine = rawFilename.replace(/[\r\n]/g, " ").trim();
+
+  // Extract extension
+  const extMatch = singleLine.match(/\.([a-zA-Z0-9]+)$/);
+  const ext = extMatch ? extMatch[1] : "png";
+  const defaultFallback = `certificate.${ext}`;
+
+  const asciiFallback = sanitizeAsciiFilename(singleLine, defaultFallback);
+
+  // RFC 5987 encode filename*
+  const rfc5987Encoded = encodeURIComponent(singleLine)
+    .replace(/['()]/g, (c) => `%${c.charCodeAt(0).toString(16).toUpperCase()}`)
+    .replace(/\*/g, "%2A");
+
+  return `attachment; filename="${asciiFallback}"; filename*=UTF-8''${rfc5987Encoded}`;
+}

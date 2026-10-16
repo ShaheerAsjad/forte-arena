@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useTransition } from "react";
+import React, { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { toast } from "sonner";
@@ -13,7 +13,8 @@ import {
   addResultAction,
   updateResultAction,
   deleteResultAction,
-  addAllApprovedAsParticipationAction,
+  addQuickPodiumAction,
+  addBatchAwardAction,
   publishResultsAction,
   unpublishResultsAction,
   markEventCompletedAction,
@@ -23,9 +24,18 @@ import {
   removeCertificateAction,
 } from "@/features/admin/certificates.actions";
 import {
-  AWARD_PRESETS,
+  PODIUM_AWARDS,
+  RUNNER_AWARD_PRESETS,
+  getAutomaticAwardForPosition,
+  validateAwardForPosition,
   validateRankUniqueness,
+  validateParticipantUniqueness,
+  validateQuickPodiumPayload,
+  validateBatchAwardPayload,
   validateEventPublishability,
+  type QuickPodiumPayload,
+  type QuickPodiumSlot,
+  type ExistingResultItem,
 } from "@/features/results/results.rules";
 import type {
   AdminResultDetail,
@@ -43,11 +53,16 @@ import {
   Eye,
   CheckCircle2,
   AlertTriangle,
-  Sparkles,
   ExternalLink,
   Upload,
   Award,
   Loader2,
+  Lock,
+  Layers,
+  Medal,
+  CheckSquare,
+  Square,
+  Sparkles,
 } from "lucide-react";
 
 interface AdminEventResultsManagerProps {
@@ -68,64 +83,179 @@ interface AdminEventResultsManagerProps {
   approvedRegistrations: AdminApprovedRegistration[];
 }
 
+function formatOrdinal(n: number): string {
+  const s = ["th", "st", "nd", "rd"];
+  const v = n % 100;
+  return n + (s[(v - 20) % 10] || s[v] || s[0]);
+}
+
 export function AdminEventResultsManager({
   event,
   initialResults,
   approvedRegistrations,
 }: AdminEventResultsManagerProps) {
-  const [, startTransition] = useTransition();
-
   const [results, setResults] = useState<AdminResultDetail[]>(initialResults);
   const [eventStatus, setEventStatus] = useState<string>(event.status);
   const [isPublished, setIsPublished] = useState<boolean>(event.resultsPublished);
 
-  // Form states
+  // Tab: Editor vs Live Podium Preview
+  const [activeTab, setActiveTab] = useState<"editor" | "preview">("editor");
+
+  // Mode for left creation panel: "single" | "quick_podium" | "batch"
+  const [creationMode, setCreationMode] = useState<"single" | "quick_podium" | "batch">("single");
+
+  // Single Result / Edit Form states
   const [editingId, setEditingId] = useState<string | null>(null);
   const [participantType, setParticipantType] = useState<"REGISTERED" | "WALKIN">("REGISTERED");
   const [selectedRegId, setSelectedRegId] = useState<string>("");
   const [customName, setCustomName] = useState<string>("");
-  const [position, setPosition] = useState<number>(results.length + 1);
-  const [isTie, setIsTie] = useState<boolean>(false);
-  const [award, setAward] = useState<string>("Champion");
+  const [position, setPosition] = useState<number>(() => {
+    const taken = new Set(initialResults.map((r) => r.position));
+    let p = 1;
+    while (taken.has(p)) p++;
+    return p;
+  });
+  const [award, setAward] = useState<string>(() => {
+    const taken = new Set(initialResults.map((r) => r.position));
+    let p = 1;
+    while (taken.has(p)) p++;
+    return getAutomaticAwardForPosition(p) ?? "Honorable Mention";
+  });
   const [score, setScore] = useState<string>("");
   const [remarks, setRemarks] = useState<string>("");
-
   const [formError, setFormError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
-  const [isPublishing, setIsPublishing] = useState<boolean>(false);
-  const [isBulkAdding, setIsBulkAdding] = useState<boolean>(false);
-  const [activeTab, setActiveTab] = useState<"editor" | "preview">("editor");
 
-  // Certificate upload & removal state per result row
+  // Quick Podium Form states
+  const [quickFirst, setQuickFirst] = useState<{
+    type: "REGISTERED" | "WALKIN" | "NONE";
+    regId: string;
+    customName: string;
+  }>({ type: "NONE", regId: "", customName: "" });
+  const [quickSecond, setQuickSecond] = useState<{
+    type: "REGISTERED" | "WALKIN" | "NONE";
+    regId: string;
+    customName: string;
+  }>({ type: "NONE", regId: "", customName: "" });
+  const [quickThird, setQuickThird] = useState<{
+    type: "REGISTERED" | "WALKIN" | "NONE";
+    regId: string;
+    customName: string;
+  }>({ type: "NONE", regId: "", customName: "" });
+  const [quickError, setQuickError] = useState<string | null>(null);
+  const [isSubmittingQuick, setIsSubmittingQuick] = useState<boolean>(false);
+
+  // Batch Award Form states
+  const [batchAward, setBatchAward] = useState<"Honorable Mention" | "Participation">("Participation");
+  const [batchSelectedIds, setBatchSelectedIds] = useState<string[]>([]);
+  const [batchError, setBatchError] = useState<string | null>(null);
+  const [isSubmittingBatch, setIsSubmittingBatch] = useState<boolean>(false);
+
+  // Status & Certificate Actions state
+  const [isPublishing, setIsPublishing] = useState<boolean>(false);
   const [uploadingCertId, setUploadingCertId] = useState<string | null>(null);
   const [removingCertId, setRemovingCertId] = useState<string | null>(null);
-  const [certErrors, setCertErrors] = useState<Record<string, string>>({});
+  const [, setCertErrors] = useState<Record<string, string>>({});
 
-  // Filter approved participants who do not yet have a result
-  const registeredIdsWithResults = new Set(
-    results.map((r) => r.registrationId).filter(Boolean)
-  );
+  // Existing podium holders
+  const existingFirst = results.find((r) => r.position === 1);
+  const existingSecond = results.find((r) => r.position === 2);
+  const existingThird = results.find((r) => r.position === 3);
+
+  // Highest recorded position
+  const maxPosition = results.reduce((max, r) => Math.max(max, r.position), 0);
+  const nextAvailableBatchPosition = Math.max(4, maxPosition + 1);
+
+  // Eligible participants for Batch Award (approved participants with no existing result)
   const unassignedRegistrations = approvedRegistrations.filter(
-    (reg) => !registeredIdsWithResults.has(reg.id) || reg.id === selectedRegId
+    (reg) => !results.some((r) => r.registrationId === reg.id)
   );
 
-  const participantSelectOptions = unassignedRegistrations.map((reg) => ({
-    value: reg.id,
-    label: reg.teamName
-      ? `${reg.teamName} (Team • Led by ${reg.userName})`
-      : `${reg.userName}${reg.rollNumber ? ` (${reg.rollNumber})` : ""}`,
-  }));
+  // Position select options for Single Form
+  const totalPositions = Math.max(25, maxPosition + 5);
+  const positionSelectOptions = Array.from({ length: totalPositions }, (_, i) => {
+    const p = i + 1;
+    const holder = results.find((r) => r.position === p && r.id !== editingId);
+    const ordinal = formatOrdinal(p);
+    if (holder) {
+      return {
+        value: String(p),
+        label: `${ordinal}: taken by ${holder.participantName}`,
+        disabled: true,
+      };
+    }
+    const autoAward = getAutomaticAwardForPosition(p);
+    return {
+      value: String(p),
+      label: `${ordinal} Place${autoAward ? ` (${autoAward})` : ""}`,
+      disabled: false,
+    };
+  });
 
-  // Auto-fill preset award when position changes
+  // Participant select options for Single Form
+  const participantSelectOptions = approvedRegistrations.map((reg) => {
+    const alreadyResult = results.find(
+      (r) => r.registrationId === reg.id && r.id !== editingId
+    );
+    const baseLabel = reg.teamName
+      ? `${reg.teamName} (Team • Led by ${reg.userName})`
+      : `${reg.userName}${reg.rollNumber ? ` (${reg.rollNumber})` : ""}`;
+
+    return {
+      value: reg.id,
+      label: alreadyResult ? `${baseLabel} (already has a result)` : baseLabel,
+      disabled: Boolean(alreadyResult),
+    };
+  });
+
+  // Helpers for Quick Podium slot options (disables existing result holders and selections in other slots)
+  const getQuickSlotOptions = (currentSlotPos: 1 | 2 | 3) => {
+    const otherSelectedRegIds = new Set<string>();
+    if (currentSlotPos !== 1 && quickFirst.type === "REGISTERED" && quickFirst.regId) {
+      otherSelectedRegIds.add(quickFirst.regId);
+    }
+    if (currentSlotPos !== 2 && quickSecond.type === "REGISTERED" && quickSecond.regId) {
+      otherSelectedRegIds.add(quickSecond.regId);
+    }
+    if (currentSlotPos !== 3 && quickThird.type === "REGISTERED" && quickThird.regId) {
+      otherSelectedRegIds.add(quickThird.regId);
+    }
+
+    return approvedRegistrations.map((reg) => {
+      const alreadyResult = results.some((r) => r.registrationId === reg.id);
+      const isPickedInOtherSlot = otherSelectedRegIds.has(reg.id);
+      const baseLabel = reg.teamName
+        ? `${reg.teamName} (Team • Led by ${reg.userName})`
+        : `${reg.userName}${reg.rollNumber ? ` (${reg.rollNumber})` : ""}`;
+
+      let disabled = false;
+      let label = baseLabel;
+      if (alreadyResult) {
+        disabled = true;
+        label = `${baseLabel} (already has a result)`;
+      } else if (isPickedInOtherSlot) {
+        disabled = true;
+        label = `${baseLabel} (selected in another slot)`;
+      }
+
+      return {
+        value: reg.id,
+        label,
+        disabled,
+      };
+    });
+  };
+
   const handlePositionChange = (newPos: number) => {
     setPosition(newPos);
     setFormError(null);
-    if (!editingId) {
-      if (newPos === 1) setAward("Champion");
-      else if (newPos === 2) setAward("Runner-up");
-      else if (newPos === 3) setAward("Second Runner-up");
-      else if (newPos === 4) setAward("Honorable Mention");
-      else setAward("Participation");
+    const auto = getAutomaticAwardForPosition(newPos);
+    if (auto) {
+      setAward(auto);
+    } else {
+      if (["Champion", "Runner-up", "Second Runner-up"].includes(award)) {
+        setAward("Honorable Mention");
+      }
     }
   };
 
@@ -134,13 +264,13 @@ export function AdminEventResultsManager({
     setParticipantType("REGISTERED");
     setSelectedRegId("");
     setCustomName("");
-    const nextPos = results.length + 1;
+
+    const taken = new Set(results.map((r) => r.position));
+    let nextPos = 1;
+    while (taken.has(nextPos)) nextPos++;
+
     setPosition(nextPos);
-    setIsTie(false);
-    if (nextPos === 1) setAward("Champion");
-    else if (nextPos === 2) setAward("Runner-up");
-    else if (nextPos === 3) setAward("Second Runner-up");
-    else setAward("Honorable Mention");
+    setAward(getAutomaticAwardForPosition(nextPos) ?? "Honorable Mention");
     setScore("");
     setRemarks("");
     setFormError(null);
@@ -148,6 +278,7 @@ export function AdminEventResultsManager({
 
   const handleEditClick = (res: AdminResultDetail) => {
     setEditingId(res.id);
+    setCreationMode("single");
     if (res.registrationId) {
       setParticipantType("REGISTERED");
       setSelectedRegId(res.registrationId);
@@ -158,19 +289,18 @@ export function AdminEventResultsManager({
       setCustomName(res.customParticipantName || res.participantName);
     }
     setPosition(res.position);
-    setIsTie(res.isTie);
-    setAward(res.award || "Champion");
+    setAward(res.award || (getAutomaticAwardForPosition(res.position) ?? "Honorable Mention"));
     setScore(res.score || "");
     setRemarks(res.remarks || "");
     setFormError(null);
     window.scrollTo({ top: 300, behavior: "smooth" });
   };
 
+  // Submit Single Result (Add or Edit)
   const handleSubmitResult = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormError(null);
 
-    // Validation
     if (participantType === "REGISTERED" && !selectedRegId) {
       setFormError("Please select an approved participant or team from the list.");
       return;
@@ -179,21 +309,35 @@ export function AdminEventResultsManager({
       setFormError("Please enter the name of the walk-in participant.");
       return;
     }
-    if (!award.trim()) {
-      setFormError("Please provide an award title (e.g. Champion, Runner-up).");
+
+    const finalAward = getAutomaticAwardForPosition(position) || award.trim();
+    const awardCheck = validateAwardForPosition(position, finalAward);
+    if (!awardCheck.valid) {
+      setFormError(awardCheck.error || "Invalid award label.");
       return;
     }
 
-    // Rank uniqueness validation
-    const existingItems = results.map((r) => ({
+    const existingItems: ExistingResultItem[] = results.map((r) => ({
       id: r.id,
       position: r.position,
-      isTie: r.isTie,
       participantName: r.participantName,
       registrationId: r.registrationId,
+      customParticipantName: r.customParticipantName,
     }));
 
-    const rankCheck = validateRankUniqueness(position, isTie, existingItems, editingId ?? undefined);
+    const participantCheck = validateParticipantUniqueness(
+      participantType,
+      participantType === "REGISTERED" ? selectedRegId : null,
+      participantType === "WALKIN" ? customName.trim() : null,
+      existingItems,
+      editingId ?? undefined
+    );
+    if (!participantCheck.valid) {
+      setFormError(participantCheck.error || "Duplicate participant.");
+      return;
+    }
+
+    const rankCheck = validateRankUniqueness(position, existingItems, editingId ?? undefined);
     if (!rankCheck.valid) {
       setFormError(rankCheck.error || "Rank conflict.");
       return;
@@ -209,10 +353,10 @@ export function AdminEventResultsManager({
           registrationId: participantType === "REGISTERED" ? selectedRegId : null,
           customParticipantName: participantType === "WALKIN" ? customName.trim() : null,
           position,
-          award: award.trim(),
+          award: finalAward,
           score: score.trim() || null,
           remarks: remarks.trim() || null,
-          isTie,
+          isTie: false,
         });
 
         if (!res.ok) {
@@ -220,7 +364,6 @@ export function AdminEventResultsManager({
           return;
         }
 
-        // Update local results
         const regInfo = approvedRegistrations.find((r) => r.id === selectedRegId);
         setResults((prev) =>
           prev
@@ -237,10 +380,10 @@ export function AdminEventResultsManager({
                         : customName.trim(),
                     teamName: participantType === "REGISTERED" ? regInfo?.teamName || null : null,
                     position,
-                    award: award.trim(),
+                    award: finalAward,
                     score: score.trim() || null,
                     remarks: remarks.trim() || null,
-                    isTie,
+                    isTie: false,
                   }
                 : r
             )
@@ -256,10 +399,10 @@ export function AdminEventResultsManager({
           registrationId: participantType === "REGISTERED" ? selectedRegId : null,
           customParticipantName: participantType === "WALKIN" ? customName.trim() : null,
           position,
-          award: award.trim(),
+          award: finalAward,
           score: score.trim() || null,
           remarks: remarks.trim() || null,
-          isTie,
+          isTie: false,
         });
 
         if (!res.ok) {
@@ -281,11 +424,11 @@ export function AdminEventResultsManager({
           teamName: participantType === "REGISTERED" ? regInfo?.teamName || null : null,
           rollNumber: participantType === "REGISTERED" ? regInfo?.rollNumber || null : null,
           position,
-          award: award.trim(),
+          award: finalAward,
           score: score.trim() || null,
           remarks: remarks.trim() || null,
           certificateUrl: null,
-          isTie,
+          isTie: false,
         };
 
         setResults((prev) => [...prev, newRecord].sort((a, b) => a.position - b.position));
@@ -296,6 +439,130 @@ export function AdminEventResultsManager({
       setFormError("An unexpected error occurred while saving.");
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  // Submit Quick Podium
+  const handleQuickPodiumSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setQuickError(null);
+
+    const existingItems: ExistingResultItem[] = results.map((r) => ({
+      id: r.id,
+      position: r.position,
+      participantName: r.participantName,
+      registrationId: r.registrationId,
+      customParticipantName: r.customParticipantName,
+    }));
+
+    const slotFirst: QuickPodiumSlot | null =
+      quickFirst.type === "NONE"
+        ? null
+        : {
+            participantType: quickFirst.type,
+            registrationId: quickFirst.type === "REGISTERED" ? quickFirst.regId : null,
+            customParticipantName:
+              quickFirst.type === "WALKIN" ? quickFirst.customName.trim() : null,
+          };
+
+    const slotSecond: QuickPodiumSlot | null =
+      quickSecond.type === "NONE"
+        ? null
+        : {
+            participantType: quickSecond.type,
+            registrationId: quickSecond.type === "REGISTERED" ? quickSecond.regId : null,
+            customParticipantName:
+              quickSecond.type === "WALKIN" ? quickSecond.customName.trim() : null,
+          };
+
+    const slotThird: QuickPodiumSlot | null =
+      quickThird.type === "NONE"
+        ? null
+        : {
+            participantType: quickThird.type,
+            registrationId: quickThird.type === "REGISTERED" ? quickThird.regId : null,
+            customParticipantName:
+              quickThird.type === "WALKIN" ? quickThird.customName.trim() : null,
+          };
+
+    const payload: QuickPodiumPayload = {
+      eventId: event.id,
+      first: slotFirst,
+      second: slotSecond,
+      third: slotThird,
+    };
+
+    const validation = validateQuickPodiumPayload(payload, existingItems);
+    if (!validation.valid) {
+      setQuickError(validation.error || "Please select at least one valid podium slot.");
+      return;
+    }
+
+    setIsSubmittingQuick(true);
+    try {
+      const res = await addQuickPodiumAction(payload);
+      if (!res.ok) {
+        setQuickError(res.error);
+        return;
+      }
+
+      toast.success(`Successfully saved ${res.data.savedCount} podium standing(s)!`);
+      window.location.reload();
+    } catch {
+      setQuickError("An unexpected error occurred while saving podium.");
+    } finally {
+      setIsSubmittingQuick(false);
+    }
+  };
+
+  // Submit Batch Award
+  const handleBatchAwardSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setBatchError(null);
+
+    if (batchSelectedIds.length === 0) {
+      setBatchError("Please tick at least one participant.");
+      return;
+    }
+
+    const existingItems: ExistingResultItem[] = results.map((r) => ({
+      id: r.id,
+      position: r.position,
+      participantName: r.participantName,
+      registrationId: r.registrationId,
+      customParticipantName: r.customParticipantName,
+    }));
+
+    const validation = validateBatchAwardPayload(
+      batchSelectedIds,
+      batchAward,
+      existingItems
+    );
+    if (!validation.valid) {
+      setBatchError(validation.error || "Selected participants conflict with existing results.");
+      return;
+    }
+
+    setIsSubmittingBatch(true);
+    try {
+      const res = await addBatchAwardAction(
+        event.id,
+        batchSelectedIds,
+        batchAward,
+        validation.startingPosition
+      );
+
+      if (!res.ok) {
+        setBatchError(res.error);
+        return;
+      }
+
+      toast.success(`Awarded "${batchAward}" to ${res.data.addedCount} participant(s)!`);
+      window.location.reload();
+    } catch {
+      setBatchError("An unexpected error occurred while saving batch awards.");
+    } finally {
+      setIsSubmittingBatch(false);
     }
   };
 
@@ -316,57 +583,6 @@ export function AdminEventResultsManager({
     }
   };
 
-  const handleBulkAddParticipation = async () => {
-    setIsBulkAdding(true);
-    try {
-      const res = await addAllApprovedAsParticipationAction(event.id);
-      if (!res.ok) {
-        toast.error(res.error);
-        return;
-      }
-      if (res.data.addedCount === 0) {
-        toast.info("All approved participants are already listed in the results.");
-      } else {
-        toast.success(`Added ${res.data.addedCount} participant(s) as Participation!`);
-        // Refresh page data
-        startTransition(() => {
-          window.location.reload();
-        });
-      }
-    } catch {
-      toast.error("Failed to bulk-add participation results.");
-    } finally {
-      setIsBulkAdding(false);
-    }
-  };
-
-  const handlePublishToggle = async () => {
-    setIsPublishing(true);
-    try {
-      if (isPublished) {
-        const res = await unpublishResultsAction(event.id);
-        if (!res.ok) {
-          toast.error(res.error);
-          return;
-        }
-        setIsPublished(false);
-        toast.success("Results unpublished. They are now hidden from the public site.");
-      } else {
-        const res = await publishResultsAction(event.id);
-        if (!res.ok) {
-          toast.error(res.error);
-          return;
-        }
-        setIsPublished(true);
-        toast.success("Results published! They are now live on the public leaderboard.");
-      }
-    } catch {
-      toast.error("Failed to toggle publish status.");
-    } finally {
-      setIsPublishing(false);
-    }
-  };
-
   const handleCertificateUpload = async (
     resultId: string,
     e: React.ChangeEvent<HTMLInputElement>
@@ -374,10 +590,7 @@ export function AdminEventResultsManager({
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Reset input value so the same file could be selected again if needed
     e.target.value = "";
-
-    // Clear previous error for this result
     setCertErrors((prev) => {
       const next = { ...prev };
       delete next[resultId];
@@ -449,6 +662,33 @@ export function AdminEventResultsManager({
     }
   };
 
+  const handlePublishToggle = async () => {
+    setIsPublishing(true);
+    try {
+      if (isPublished) {
+        const res = await unpublishResultsAction(event.id);
+        if (!res.ok) {
+          toast.error(res.error);
+          return;
+        }
+        setIsPublished(false);
+        toast.success("Results unpublished. They are now hidden from the public site.");
+      } else {
+        const res = await publishResultsAction(event.id);
+        if (!res.ok) {
+          toast.error(res.error);
+          return;
+        }
+        setIsPublished(true);
+        toast.success("Results published! They are now live on the public leaderboard.");
+      }
+    } catch {
+      toast.error("Failed to toggle publish status.");
+    } finally {
+      setIsPublishing(false);
+    }
+  };
+
   const handleMarkCompleted = async () => {
     try {
       const res = await markEventCompletedAction(event.id);
@@ -463,7 +703,6 @@ export function AdminEventResultsManager({
     }
   };
 
-  // Convert results for preview
   const previewResults: RankedResultItem[] = results.map((r) => ({
     id: r.id,
     position: r.position,
@@ -471,7 +710,7 @@ export function AdminEventResultsManager({
     certificateUrl: r.certificateUrl,
     remarks: r.remarks,
     score: r.score,
-    isTie: r.isTie,
+    isTie: false,
     winnerName: r.participantName,
     teamName: r.teamName,
     department: null,
@@ -650,231 +889,669 @@ export function AdminEventResultsManager({
       ) : (
         /* Editor Tab */
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-          {/* Left Column: Form */}
-          <div className="lg:col-span-5 space-y-6">
-            <Card className="p-6 sm:p-7 bg-white border border-navy-100 rounded-2xl shadow-sm space-y-5">
-              <div className="flex items-center justify-between border-b border-navy-50 pb-3">
-                <div className="flex items-center gap-2">
-                  <Trophy className="w-4 h-4 text-gold-500" />
-                  <h3 className="font-heading text-base font-bold text-navy-950">
-                    {editingId ? "Edit Standings Entry" : "Record New Result"}
-                  </h3>
-                </div>
-                {editingId && (
-                  <button
-                    type="button"
-                    onClick={resetForm}
-                    className="text-xs font-semibold text-mist hover:text-navy-950"
-                  >
-                    Cancel
-                  </button>
-                )}
+          {/* Left Column: Result Creation & Entry */}
+          <div className="lg:col-span-5 space-y-4">
+            {/* Mode Selector Tabs (Only visible when NOT editing an existing result) */}
+            {!editingId && (
+              <div className="grid grid-cols-3 gap-1.5 p-1.5 bg-navy-50 border border-navy-100 rounded-2xl text-xs font-bold">
+                <button
+                  type="button"
+                  onClick={() => setCreationMode("single")}
+                  className={`py-2 px-2.5 rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1.5 text-center ${
+                    creationMode === "single"
+                      ? "bg-white text-navy-950 shadow-xs border border-navy-100"
+                      : "text-mist hover:text-navy-900"
+                  }`}
+                >
+                  <Plus className="w-3.5 h-3.5 text-gold-500 shrink-0" />
+                  <span className="truncate">Single Entry</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCreationMode("quick_podium")}
+                  className={`py-2 px-2.5 rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1.5 text-center ${
+                    creationMode === "quick_podium"
+                      ? "bg-white text-navy-950 shadow-xs border border-navy-100"
+                      : "text-mist hover:text-navy-900"
+                  }`}
+                >
+                  <Medal className="w-3.5 h-3.5 text-gold-500 shrink-0" />
+                  <span className="truncate">Quick Podium</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCreationMode("batch")}
+                  className={`py-2 px-2.5 rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1.5 text-center ${
+                    creationMode === "batch"
+                      ? "bg-white text-navy-950 shadow-xs border border-navy-100"
+                      : "text-mist hover:text-navy-900"
+                  }`}
+                >
+                  <Layers className="w-3.5 h-3.5 text-navy-700 shrink-0" />
+                  <span className="truncate">Batch Award</span>
+                </button>
               </div>
+            )}
 
-              {formError && (
-                <div className="p-3.5 rounded-xl bg-danger-bg border border-danger/20 text-danger text-xs font-medium">
-                  {formError}
-                </div>
-              )}
-
-              <form onSubmit={handleSubmitResult} className="space-y-4">
-                {/* Participant Source Toggle */}
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold uppercase tracking-wider text-mist">
-                    Participant Type
-                  </label>
-                  <div className="grid grid-cols-2 gap-2">
+            {/* FORM 1: Single Result / Edit Form */}
+            {(creationMode === "single" || Boolean(editingId)) && (
+              <Card className="p-6 sm:p-7 bg-white border border-navy-100 rounded-2xl shadow-sm space-y-5">
+                <div className="flex items-center justify-between border-b border-navy-50 pb-3">
+                  <div className="flex items-center gap-2">
+                    <Trophy className="w-4 h-4 text-gold-500" />
+                    <h3 className="font-heading text-base font-bold text-navy-950">
+                      {editingId ? "Edit Standings Entry" : "Record Single Result"}
+                    </h3>
+                  </div>
+                  {editingId && (
                     <button
                       type="button"
-                      onClick={() => setParticipantType("REGISTERED")}
-                      className={`py-2 px-3 rounded-xl text-xs font-semibold border transition-all cursor-pointer ${
-                        participantType === "REGISTERED"
-                          ? "bg-navy-900 text-ivory border-navy-900 shadow-xs"
-                          : "bg-navy-50 text-mist hover:text-navy-950 border-navy-100"
-                      }`}
+                      onClick={resetForm}
+                      className="text-xs font-semibold text-rose-600 hover:text-rose-800 cursor-pointer"
                     >
-                      Approved Roster
+                      Cancel Edit
                     </button>
-                    <button
-                      type="button"
-                      onClick={() => setParticipantType("WALKIN")}
-                      className={`py-2 px-3 rounded-xl text-xs font-semibold border transition-all cursor-pointer ${
-                        participantType === "WALKIN"
-                          ? "bg-navy-900 text-ivory border-navy-900 shadow-xs"
-                          : "bg-navy-50 text-mist hover:text-navy-950 border-navy-100"
-                      }`}
-                    >
-                      Walk-in Candidate
-                    </button>
-                  </div>
+                  )}
                 </div>
 
-                {/* Participant Selector */}
-                {participantType === "REGISTERED" ? (
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-navy-950">
-                      Approved Participant / Team
-                    </label>
-                    {participantSelectOptions.length === 0 && !editingId ? (
-                      <p className="text-xs text-mist italic">
-                        All approved registrations are already listed in the results.
-                      </p>
-                    ) : (
-                      <Select
-                        placeholder="Choose approved student or team..."
-                        options={participantSelectOptions}
-                        value={selectedRegId}
-                        onChange={(val) => {
-                          setSelectedRegId(val);
-                          setFormError(null);
-                        }}
-                      />
-                    )}
-                  </div>
-                ) : (
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-navy-950">
-                      Walk-in Participant Name
-                    </label>
-                    <Input
-                      placeholder="e.g. John Doe (Walk-in)"
-                      value={customName}
-                      onChange={(e) => {
-                        setCustomName(e.target.value);
-                        setFormError(null);
-                      }}
-                    />
+                {formError && (
+                  <div className="p-3.5 rounded-xl bg-danger-bg border border-danger/20 text-danger text-xs font-medium">
+                    {formError}
                   </div>
                 )}
 
-                {/* Position & Tie */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-end">
+                <form onSubmit={handleSubmitResult} className="space-y-4">
+                  {/* Participant Source Toggle */}
                   <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-navy-950">
-                      Position / Rank
+                    <label className="text-xs font-bold uppercase tracking-wider text-mist">
+                      Participant Type
                     </label>
-                    <Input
-                      type="number"
-                      min={1}
-                      value={position}
-                      onChange={(e) =>
-                        handlePositionChange(Math.max(1, parseInt(e.target.value, 10) || 1))
-                      }
-                    />
-                  </div>
-
-                  <div className="pb-2.5">
-                    <label className="inline-flex items-center gap-2 cursor-pointer select-none text-xs font-bold text-navy-900">
-                      <input
-                        type="checkbox"
-                        checked={isTie}
-                        onChange={(e) => {
-                          setIsTie(e.target.checked);
-                          setFormError(null);
-                        }}
-                        className="w-4 h-4 rounded text-gold-500 focus:ring-gold-400"
-                      />
-                      <span>Shared Tie (Joint Rank)</span>
-                    </label>
-                  </div>
-                </div>
-
-                {/* Award Presets & Label */}
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <label className="text-xs font-bold text-navy-950">Award Title</label>
-                    <span className="text-[10px] text-mist font-medium">Click a preset</span>
-                  </div>
-
-                  <div className="flex flex-wrap gap-1.5">
-                    {AWARD_PRESETS.map((preset) => (
+                    <div className="grid grid-cols-2 gap-2">
                       <button
-                        key={preset}
                         type="button"
-                        onClick={() => setAward(preset)}
-                        className={`text-[11px] font-semibold px-2.5 py-1 rounded-lg border transition-all cursor-pointer ${
-                          award === preset
-                            ? "bg-gold-500 text-navy-950 border-gold-600 font-bold shadow-xs"
-                            : "bg-navy-50/80 text-ink/80 hover:bg-navy-100 border-navy-100"
+                        onClick={() => setParticipantType("REGISTERED")}
+                        className={`py-2 px-3 rounded-xl text-xs font-semibold border transition-all cursor-pointer ${
+                          participantType === "REGISTERED"
+                            ? "bg-navy-900 text-ivory border-navy-900 shadow-xs"
+                            : "bg-navy-50 text-mist hover:text-navy-950 border-navy-100"
                         }`}
                       >
-                        {preset}
+                        Approved Roster
                       </button>
-                    ))}
+                      <button
+                        type="button"
+                        onClick={() => setParticipantType("WALKIN")}
+                        className={`py-2 px-3 rounded-xl text-xs font-semibold border transition-all cursor-pointer ${
+                          participantType === "WALKIN"
+                            ? "bg-navy-900 text-ivory border-navy-900 shadow-xs"
+                            : "bg-navy-50 text-mist hover:text-navy-950 border-navy-100"
+                        }`}
+                      >
+                        Walk-in Candidate
+                      </button>
+                    </div>
                   </div>
 
-                  <Input
-                    placeholder="e.g. Champion, Runner-up, Best Speaker"
-                    value={award}
-                    onChange={(e) => setAward(e.target.value)}
-                  />
-                </div>
+                  {/* Participant Selector */}
+                  {participantType === "REGISTERED" ? (
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-bold text-navy-950">
+                        Approved Participant / Team
+                      </label>
+                      {participantSelectOptions.length === 0 && !editingId ? (
+                        <p className="text-xs text-mist italic">
+                          No approved registrations found for this event.
+                        </p>
+                      ) : (
+                        <Select
+                          placeholder="Choose approved student or team..."
+                          options={participantSelectOptions}
+                          value={selectedRegId}
+                          onChange={(val) => {
+                            setSelectedRegId(val);
+                            setFormError(null);
+                          }}
+                        />
+                      )}
+                    </div>
+                  ) : (
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-bold text-navy-950">
+                        Walk-in Participant Name
+                      </label>
+                      <Input
+                        placeholder="e.g. John Doe (Walk-in)"
+                        value={customName}
+                        onChange={(e) => {
+                          setCustomName(e.target.value);
+                          setFormError(null);
+                        }}
+                      />
+                    </div>
+                  )}
 
-                {/* Optional Score & Remarks */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {/* Position Select */}
                   <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-mist">
-                      Score / Points (Optional)
-                    </label>
-                    <Input
-                      placeholder="e.g. 98.5 pts or 3 - 1"
-                      value={score}
-                      onChange={(e) => setScore(e.target.value)}
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-bold text-navy-950">Position / Rank</label>
+                      <span className="text-[10px] text-mist">
+                        Positions 1-3 are strictly unique
+                      </span>
+                    </div>
+                    <Select
+                      options={positionSelectOptions}
+                      value={String(position)}
+                      onChange={(val) => handlePositionChange(parseInt(val, 10))}
                     />
                   </div>
 
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-mist">
-                      Judge Note (Optional)
-                    </label>
-                    <Input
-                      placeholder="e.g. Outstanding debate"
-                      value={remarks}
-                      onChange={(e) => setRemarks(e.target.value)}
-                    />
+                  {/* Award Field */}
+                  {position <= 3 ? (
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <label className="text-xs font-bold text-navy-950">Award Label</label>
+                        <span className="text-[10px] font-bold text-gold-700 bg-gold-50 px-2 py-0.5 rounded border border-gold-300 flex items-center gap-1">
+                          <Lock className="w-3 h-3" />
+                          <span>Locked: Automatic for Podium</span>
+                        </span>
+                      </div>
+                      <Input
+                        value={PODIUM_AWARDS[position] || "Champion"}
+                        readOnly
+                        disabled
+                        className="bg-navy-50/80 text-navy-950 font-bold cursor-not-allowed border-navy-200"
+                      />
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <label className="text-xs font-bold text-navy-950">Award Label</label>
+                        <span className="text-[10px] text-mist font-medium">Click a preset</span>
+                      </div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {RUNNER_AWARD_PRESETS.map((preset) => (
+                          <button
+                            key={preset}
+                            type="button"
+                            onClick={() => setAward(preset)}
+                            className={`text-[11px] font-semibold px-2.5 py-1 rounded-lg border transition-all cursor-pointer ${
+                              award === preset
+                                ? "bg-gold-500 text-navy-950 border-gold-600 font-bold shadow-xs"
+                                : "bg-navy-50/80 text-ink/80 hover:bg-navy-100 border-navy-100"
+                            }`}
+                          >
+                            {preset}
+                          </button>
+                        ))}
+                      </div>
+                      <Input
+                        placeholder="e.g. Honorable Mention, Participation, Best Speaker"
+                        value={award}
+                        onChange={(e) => setAward(e.target.value)}
+                      />
+                      {["champion", "runner-up", "second runner-up"].includes(award.trim().toLowerCase()) && (
+                        <p className="text-[11px] text-danger font-medium">
+                          Positions 4+ cannot be Champion or Runner-up.
+                        </p>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Optional Score & Remarks */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-bold text-mist">
+                        Score / Points (Optional)
+                      </label>
+                      <Input
+                        placeholder="e.g. 98.5 pts or 3 - 1"
+                        value={score}
+                        onChange={(e) => setScore(e.target.value)}
+                      />
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-bold text-mist">
+                        Judge Note (Optional)
+                      </label>
+                      <Input
+                        placeholder="e.g. Outstanding debate"
+                        value={remarks}
+                        onChange={(e) => setRemarks(e.target.value)}
+                      />
+                    </div>
                   </div>
+
+                  {/* Submit action */}
+                  <div className="pt-2">
+                    <Button
+                      type="submit"
+                      variant="gold"
+                      className="w-full font-bold shadow-sm"
+                      isLoading={isSubmitting}
+                    >
+                      <Plus className="w-4 h-4 mr-1.5" />
+                      <span>{editingId ? "Update Result Entry" : "Save Result"}</span>
+                    </Button>
+                  </div>
+                </form>
+              </Card>
+            )}
+
+            {/* FORM 2: Quick Podium Form */}
+            {creationMode === "quick_podium" && !editingId && (
+              <Card className="p-6 sm:p-7 bg-white border border-navy-100 rounded-2xl shadow-sm space-y-5">
+                <div className="border-b border-navy-50 pb-3">
+                  <div className="flex items-center gap-2">
+                    <Medal className="w-4 h-4 text-gold-500" />
+                    <h3 className="font-heading text-base font-bold text-navy-950">
+                      Quick Podium Setup (1st - 3rd)
+                    </h3>
+                  </div>
+                  <p className="text-xs text-mist mt-1 leading-relaxed">
+                    Assign 1st, 2nd, and 3rd place in one shot. Slots can be left empty if not yet determined. Saved in one atomic transaction.
+                  </p>
                 </div>
 
-                {/* Submit action */}
-                <div className="pt-2">
+                {quickError && (
+                  <div className="p-3.5 rounded-xl bg-danger-bg border border-danger/20 text-danger text-xs font-medium">
+                    {quickError}
+                  </div>
+                )}
+
+                <form onSubmit={handleQuickPodiumSubmit} className="space-y-5">
+                  {/* Slot 1: Champion */}
+                  <div className="p-3.5 rounded-xl bg-gold-50/50 border border-gold-200/70 space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="w-6 h-6 rounded-lg bg-gold-500 text-navy-950 font-black text-xs flex items-center justify-center">
+                          #1
+                        </span>
+                        <span className="font-heading font-extrabold text-xs text-navy-950">
+                          1st Place: Champion
+                        </span>
+                      </div>
+                      {existingFirst && (
+                        <span className="text-[10px] font-bold text-gold-800 bg-gold-100 px-2 py-0.5 rounded-full border border-gold-300">
+                          Already Assigned
+                        </span>
+                      )}
+                    </div>
+
+                    {existingFirst ? (
+                      <p className="text-xs text-navy-900 font-semibold bg-white p-2.5 rounded-lg border border-gold-200">
+                        Current Holder: <strong>{existingFirst.participantName}</strong>
+                      </p>
+                    ) : (
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setQuickFirst((prev) => ({ ...prev, type: "REGISTERED" }))}
+                            className={`px-2.5 py-1 text-[11px] font-bold rounded-lg border cursor-pointer ${
+                              quickFirst.type === "REGISTERED"
+                                ? "bg-navy-900 text-ivory border-navy-900"
+                                : "bg-white text-mist border-navy-100"
+                            }`}
+                          >
+                            Approved
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setQuickFirst((prev) => ({ ...prev, type: "WALKIN" }))}
+                            className={`px-2.5 py-1 text-[11px] font-bold rounded-lg border cursor-pointer ${
+                              quickFirst.type === "WALKIN"
+                                ? "bg-navy-900 text-ivory border-navy-900"
+                                : "bg-white text-mist border-navy-100"
+                            }`}
+                          >
+                            Walk-in
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setQuickFirst({ type: "NONE", regId: "", customName: "" })}
+                            className={`px-2.5 py-1 text-[11px] font-bold rounded-lg border cursor-pointer ${
+                              quickFirst.type === "NONE"
+                                ? "bg-slate-200 text-slate-800 border-slate-300"
+                                : "bg-white text-mist border-navy-100"
+                            }`}
+                          >
+                            Leave Empty
+                          </button>
+                        </div>
+
+                        {quickFirst.type === "REGISTERED" && (
+                          <Select
+                            placeholder="Choose 1st place winner..."
+                            options={getQuickSlotOptions(1)}
+                            value={quickFirst.regId}
+                            onChange={(val) => setQuickFirst((prev) => ({ ...prev, regId: val }))}
+                          />
+                        )}
+                        {quickFirst.type === "WALKIN" && (
+                          <Input
+                            placeholder="Walk-in Champion name..."
+                            value={quickFirst.customName}
+                            onChange={(e) =>
+                              setQuickFirst((prev) => ({ ...prev, customName: e.target.value }))
+                            }
+                          />
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Slot 2: Runner-up */}
+                  <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="w-6 h-6 rounded-lg bg-slate-300 text-slate-800 font-black text-xs flex items-center justify-center">
+                          #2
+                        </span>
+                        <span className="font-heading font-extrabold text-xs text-navy-950">
+                          2nd Place: Runner-up
+                        </span>
+                      </div>
+                      {existingSecond && (
+                        <span className="text-[10px] font-bold text-slate-700 bg-slate-200 px-2 py-0.5 rounded-full border border-slate-300">
+                          Already Assigned
+                        </span>
+                      )}
+                    </div>
+
+                    {existingSecond ? (
+                      <p className="text-xs text-navy-900 font-semibold bg-white p-2.5 rounded-lg border border-slate-200">
+                        Current Holder: <strong>{existingSecond.participantName}</strong>
+                      </p>
+                    ) : (
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setQuickSecond((prev) => ({ ...prev, type: "REGISTERED" }))}
+                            className={`px-2.5 py-1 text-[11px] font-bold rounded-lg border cursor-pointer ${
+                              quickSecond.type === "REGISTERED"
+                                ? "bg-navy-900 text-ivory border-navy-900"
+                                : "bg-white text-mist border-navy-100"
+                            }`}
+                          >
+                            Approved
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setQuickSecond((prev) => ({ ...prev, type: "WALKIN" }))}
+                            className={`px-2.5 py-1 text-[11px] font-bold rounded-lg border cursor-pointer ${
+                              quickSecond.type === "WALKIN"
+                                ? "bg-navy-900 text-ivory border-navy-900"
+                                : "bg-white text-mist border-navy-100"
+                            }`}
+                          >
+                            Walk-in
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setQuickSecond({ type: "NONE", regId: "", customName: "" })}
+                            className={`px-2.5 py-1 text-[11px] font-bold rounded-lg border cursor-pointer ${
+                              quickSecond.type === "NONE"
+                                ? "bg-slate-200 text-slate-800 border-slate-300"
+                                : "bg-white text-mist border-navy-100"
+                            }`}
+                          >
+                            Leave Empty
+                          </button>
+                        </div>
+
+                        {quickSecond.type === "REGISTERED" && (
+                          <Select
+                            placeholder="Choose 2nd place winner..."
+                            options={getQuickSlotOptions(2)}
+                            value={quickSecond.regId}
+                            onChange={(val) => setQuickSecond((prev) => ({ ...prev, regId: val }))}
+                          />
+                        )}
+                        {quickSecond.type === "WALKIN" && (
+                          <Input
+                            placeholder="Walk-in Runner-up name..."
+                            value={quickSecond.customName}
+                            onChange={(e) =>
+                              setQuickSecond((prev) => ({ ...prev, customName: e.target.value }))
+                            }
+                          />
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Slot 3: Second Runner-up */}
+                  <div className="p-3.5 rounded-xl bg-amber-50/50 border border-amber-200/70 space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="w-6 h-6 rounded-lg bg-amber-700 text-amber-50 font-black text-xs flex items-center justify-center">
+                          #3
+                        </span>
+                        <span className="font-heading font-extrabold text-xs text-navy-950">
+                          3rd Place: Second Runner-up
+                        </span>
+                      </div>
+                      {existingThird && (
+                        <span className="text-[10px] font-bold text-amber-800 bg-amber-100 px-2 py-0.5 rounded-full border border-amber-300">
+                          Already Assigned
+                        </span>
+                      )}
+                    </div>
+
+                    {existingThird ? (
+                      <p className="text-xs text-navy-900 font-semibold bg-white p-2.5 rounded-lg border border-amber-200">
+                        Current Holder: <strong>{existingThird.participantName}</strong>
+                      </p>
+                    ) : (
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setQuickThird((prev) => ({ ...prev, type: "REGISTERED" }))}
+                            className={`px-2.5 py-1 text-[11px] font-bold rounded-lg border cursor-pointer ${
+                              quickThird.type === "REGISTERED"
+                                ? "bg-navy-900 text-ivory border-navy-900"
+                                : "bg-white text-mist border-navy-100"
+                            }`}
+                          >
+                            Approved
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setQuickThird((prev) => ({ ...prev, type: "WALKIN" }))}
+                            className={`px-2.5 py-1 text-[11px] font-bold rounded-lg border cursor-pointer ${
+                              quickThird.type === "WALKIN"
+                                ? "bg-navy-900 text-ivory border-navy-900"
+                                : "bg-white text-mist border-navy-100"
+                            }`}
+                          >
+                            Walk-in
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setQuickThird({ type: "NONE", regId: "", customName: "" })}
+                            className={`px-2.5 py-1 text-[11px] font-bold rounded-lg border cursor-pointer ${
+                              quickThird.type === "NONE"
+                                ? "bg-slate-200 text-slate-800 border-slate-300"
+                                : "bg-white text-mist border-navy-100"
+                            }`}
+                          >
+                            Leave Empty
+                          </button>
+                        </div>
+
+                        {quickThird.type === "REGISTERED" && (
+                          <Select
+                            placeholder="Choose 3rd place winner..."
+                            options={getQuickSlotOptions(3)}
+                            value={quickThird.regId}
+                            onChange={(val) => setQuickThird((prev) => ({ ...prev, regId: val }))}
+                          />
+                        )}
+                        {quickThird.type === "WALKIN" && (
+                          <Input
+                            placeholder="Walk-in Second Runner-up name..."
+                            value={quickThird.customName}
+                            onChange={(e) =>
+                              setQuickThird((prev) => ({ ...prev, customName: e.target.value }))
+                            }
+                          />
+                        )}
+                      </div>
+                    )}
+                  </div>
+
                   <Button
                     type="submit"
                     variant="gold"
                     className="w-full font-bold shadow-sm"
-                    isLoading={isSubmitting}
+                    isLoading={isSubmittingQuick}
                   >
-                    <Plus className="w-4 h-4 mr-1.5" />
-                    <span>{editingId ? "Update Result Entry" : "Save Result"}</span>
+                    <Medal className="w-4 h-4 mr-1.5" />
+                    <span>Save Podium Standings</span>
                   </Button>
-                </div>
-              </form>
-            </Card>
+                </form>
+              </Card>
+            )}
 
-            {/* Bulk Action Card */}
-            <Card className="p-5 bg-navy-50/50 border border-navy-100 rounded-2xl space-y-3">
-              <div className="flex items-center gap-2">
-                <Sparkles className="w-4 h-4 text-gold-500" />
-                <h4 className="font-heading text-xs font-bold uppercase tracking-wider text-navy-950">
-                  Bulk Participation Utility
-                </h4>
-              </div>
-              <p className="text-xs text-mist leading-relaxed">
-                Automatically add all remaining approved participants with the &quot;Participation&quot; award. Existing winners are kept untouched.
-              </p>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="w-full font-semibold border-navy-200"
-                onClick={handleBulkAddParticipation}
-                isLoading={isBulkAdding}
-              >
-                Add All Approved as Participation
-              </Button>
-            </Card>
+            {/* FORM 3: Batch Award Form */}
+            {creationMode === "batch" && !editingId && (
+              <Card className="p-6 sm:p-7 bg-white border border-navy-100 rounded-2xl shadow-sm space-y-5">
+                <div className="border-b border-navy-50 pb-3">
+                  <div className="flex items-center gap-2">
+                    <Layers className="w-4 h-4 text-gold-500" />
+                    <h3 className="font-heading text-base font-bold text-navy-950">
+                      Add Several With Same Award
+                    </h3>
+                  </div>
+                  <p className="text-xs text-mist mt-1 leading-relaxed">
+                    Tick approved participants and assign them an award in one transaction. Consecutive positions will automatically start at rank #{nextAvailableBatchPosition}.
+                  </p>
+                </div>
+
+                {batchError && (
+                  <div className="p-3.5 rounded-xl bg-danger-bg border border-danger/20 text-danger text-xs font-medium">
+                    {batchError}
+                  </div>
+                )}
+
+                <form onSubmit={handleBatchAwardSubmit} className="space-y-4">
+                  {/* Award Selection */}
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-navy-950">Award To Grant</label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setBatchAward("Participation")}
+                        className={`py-2 px-3 rounded-xl text-xs font-semibold border transition-all cursor-pointer ${
+                          batchAward === "Participation"
+                            ? "bg-navy-900 text-ivory border-navy-900 shadow-xs"
+                            : "bg-navy-50 text-mist hover:text-navy-950 border-navy-100"
+                        }`}
+                      >
+                        Participation
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setBatchAward("Honorable Mention")}
+                        className={`py-2 px-3 rounded-xl text-xs font-semibold border transition-all cursor-pointer ${
+                          batchAward === "Honorable Mention"
+                            ? "bg-navy-900 text-ivory border-navy-900 shadow-xs"
+                            : "bg-navy-50 text-mist hover:text-navy-950 border-navy-100"
+                        }`}
+                      >
+                        Honorable Mention
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Participants List */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-bold text-navy-950">
+                        Select Participants ({batchSelectedIds.length} of {unassignedRegistrations.length})
+                      </label>
+                      {unassignedRegistrations.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (batchSelectedIds.length === unassignedRegistrations.length) {
+                              setBatchSelectedIds([]);
+                            } else {
+                              setBatchSelectedIds(unassignedRegistrations.map((r) => r.id));
+                            }
+                          }}
+                          className="text-[11px] font-bold text-gold-600 hover:text-gold-700 cursor-pointer"
+                        >
+                          {batchSelectedIds.length === unassignedRegistrations.length
+                            ? "Deselect All"
+                            : "Select All"}
+                        </button>
+                      )}
+                    </div>
+
+                    {unassignedRegistrations.length === 0 ? (
+                      <div className="p-6 text-center text-xs text-mist bg-navy-50/50 rounded-xl border border-navy-100">
+                        All approved participants already have results recorded for this event.
+                      </div>
+                    ) : (
+                      <div className="max-h-60 overflow-y-auto border border-navy-100 rounded-xl divide-y divide-navy-50 bg-white">
+                        {unassignedRegistrations.map((reg) => {
+                          const isSelected = batchSelectedIds.includes(reg.id);
+                          const name = reg.teamName
+                            ? `${reg.teamName} (Team • Led by ${reg.userName})`
+                            : `${reg.userName}${reg.rollNumber ? ` (${reg.rollNumber})` : ""}`;
+
+                          return (
+                            <label
+                              key={reg.id}
+                              className={`flex items-center gap-3 p-2.5 text-xs font-medium cursor-pointer transition-colors ${
+                                isSelected ? "bg-gold-50/50 text-navy-950" : "hover:bg-navy-50/60 text-navy-900"
+                              }`}
+                            >
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setBatchSelectedIds((prev) =>
+                                    isSelected ? prev.filter((id) => id !== reg.id) : [...prev, reg.id]
+                                  );
+                                }}
+                                className="shrink-0 text-navy-900"
+                              >
+                                {isSelected ? (
+                                  <CheckSquare className="w-4 h-4 text-gold-600" />
+                                ) : (
+                                  <Square className="w-4 h-4 text-mist" />
+                                )}
+                              </button>
+                              <span className="truncate">{name}</span>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+
+                  <Button
+                    type="submit"
+                    variant="gold"
+                    className="w-full font-bold shadow-sm"
+                    isLoading={isSubmittingBatch}
+                    disabled={unassignedRegistrations.length === 0 || batchSelectedIds.length === 0}
+                  >
+                    <Sparkles className="w-4 h-4 mr-1.5" />
+                    <span>
+                      Grant &ldquo;{batchAward}&rdquo; to {batchSelectedIds.length} Participant(s)
+                    </span>
+                  </Button>
+                </form>
+              </Card>
+            )}
           </div>
 
-          {/* Right Column: Existing Results List */}
+          {/* Right Column: Existing Results List & Certificate Manager */}
           <div className="lg:col-span-7 space-y-4">
             <div className="flex items-center justify-between pb-2 border-b border-navy-100">
               <h3 className="font-heading text-lg font-extrabold text-navy-950 flex items-center gap-2">
@@ -888,7 +1565,7 @@ export function AdminEventResultsManager({
               <Card className="p-12 text-center text-mist bg-white rounded-2xl border border-navy-100 space-y-2">
                 <p className="font-semibold text-sm">No results recorded yet.</p>
                 <p className="text-xs">
-                  Fill in the form on the left to assign 1st, 2nd, and 3rd place winners.
+                  Use the options on the left to add podium winners or batch participation results.
                 </p>
               </Card>
             ) : (
@@ -925,11 +1602,6 @@ export function AdminEventResultsManager({
                               <span className="font-heading font-extrabold text-sm text-navy-950 truncate">
                                 {res.participantName}
                               </span>
-                              {res.isTie && (
-                                <span className="text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-300 px-1.5 py-0.2 rounded">
-                                  TIE
-                                </span>
-                              )}
                             </div>
 
                             <div className="flex flex-wrap items-center gap-2 text-xs text-mist pt-0.5">
@@ -937,7 +1609,9 @@ export function AdminEventResultsManager({
                                 {res.award || "Award"}
                               </span>
                               {res.score && (
-                                <span>• Score: <strong className="font-mono text-navy-900">{res.score}</strong></span>
+                                <span>
+                                  • Score: <strong className="font-mono text-navy-900">{res.score}</strong>
+                                </span>
                               )}
                               {res.remarks && (
                                 <span className="italic truncate max-w-[200px]">
@@ -954,7 +1628,7 @@ export function AdminEventResultsManager({
                             type="button"
                             onClick={() => handleEditClick(res)}
                             title="Edit Result"
-                            className="p-1.5 rounded-lg text-mist hover:text-navy-950 hover:bg-navy-50 transition-colors"
+                            className="p-1.5 rounded-lg text-mist hover:text-navy-950 hover:bg-navy-50 transition-colors cursor-pointer"
                           >
                             <Edit2 className="w-4 h-4" />
                           </button>
@@ -962,7 +1636,7 @@ export function AdminEventResultsManager({
                             type="button"
                             onClick={() => handleDelete(res.id)}
                             title="Delete Result"
-                            className="p-1.5 rounded-lg text-mist hover:text-danger hover:bg-rose-50 transition-colors"
+                            className="p-1.5 rounded-lg text-mist hover:text-danger hover:bg-rose-50 transition-colors cursor-pointer"
                           >
                             <Trash2 className="w-4 h-4" />
                           </button>
@@ -1017,7 +1691,6 @@ export function AdminEventResultsManager({
 
                         {/* Action buttons with loading states */}
                         <div className="flex items-center gap-2 self-end sm:self-center">
-                          {/* Hidden file input */}
                           <input
                             type="file"
                             id={`cert-upload-${res.id}`}
@@ -1050,34 +1723,30 @@ export function AdminEventResultsManager({
                                 )}
                               </label>
 
-                              <Button
+                              <button
                                 type="button"
-                                variant="ghost"
-                                size="sm"
-                                className="text-danger hover:text-danger hover:bg-rose-50 text-xs px-2.5 py-1 h-auto"
-                                disabled={uploadingCertId === res.id || removingCertId === res.id}
                                 onClick={() => handleCertificateRemove(res.id)}
+                                disabled={uploadingCertId === res.id || removingCertId === res.id}
+                                className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded-lg border border-rose-200 bg-white hover:bg-rose-50 text-rose-700 transition-colors shadow-2xs cursor-pointer disabled:opacity-50"
                               >
                                 {removingCertId === res.id ? (
                                   <>
-                                    <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" />
+                                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
                                     <span>Removing...</span>
                                   </>
                                 ) : (
                                   <>
-                                    <Trash2 className="w-3.5 h-3.5 mr-1" />
+                                    <Trash2 className="w-3.5 h-3.5" />
                                     <span>Remove</span>
                                   </>
                                 )}
-                              </Button>
+                              </button>
                             </>
                           ) : (
                             <label
                               htmlFor={`cert-upload-${res.id}`}
-                              className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg bg-navy-950 hover:bg-navy-900 text-ivory transition-colors shadow-2xs cursor-pointer ${
-                                uploadingCertId === res.id || removingCertId === res.id
-                                  ? "opacity-50 pointer-events-none"
-                                  : ""
+                              className={`inline-flex items-center gap-1 px-3 py-1.5 text-xs font-bold rounded-lg bg-navy-900 text-ivory hover:bg-navy-800 transition-colors shadow-2xs cursor-pointer ${
+                                uploadingCertId === res.id ? "opacity-50 pointer-events-none" : ""
                               }`}
                             >
                               {uploadingCertId === res.id ? (
@@ -1088,21 +1757,13 @@ export function AdminEventResultsManager({
                               ) : (
                                 <>
                                   <Upload className="w-3.5 h-3.5 text-gold-400" />
-                                  <span>Upload</span>
+                                  <span>Upload Certificate</span>
                                 </>
                               )}
                             </label>
                           )}
                         </div>
                       </div>
-
-                      {/* Error state alert */}
-                      {certErrors[res.id] && (
-                        <div className="p-2 rounded-lg bg-danger-bg border border-danger/20 text-danger text-xs font-medium flex items-start gap-1.5">
-                          <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
-                          <span>{certErrors[res.id]}</span>
-                        </div>
-                      )}
                     </Card>
                   );
                 })}

@@ -3,6 +3,8 @@ import {
   detectImageSignature,
   validateCertificateFile,
   parseCertificateStoragePath,
+  sanitizeAsciiFilename,
+  buildContentDispositionHeader,
   MAX_CERTIFICATE_SIZE_BYTES,
 } from "@/features/results/certificates.utils";
 
@@ -105,5 +107,70 @@ describe("Certificates Utils: Storage Path Parsing & Security", () => {
   it("rejects empty or root certificates paths", () => {
     expect(parseCertificateStoragePath("")).toBeNull();
     expect(parseCertificateStoragePath("certificates/")).toBeNull();
+  });
+});
+
+describe("Certificates Utils: Content-Disposition & Filename Sanitizer", () => {
+  it("sanitizes filenames containing quotes, line breaks, and slashes for ASCII fallback", () => {
+    const malicious = `cert"ificate\r\n\t<special>:name.png`;
+    const clean = sanitizeAsciiFilename(malicious);
+    expect(clean).not.toContain('"');
+    expect(clean).not.toContain("\r");
+    expect(clean).not.toContain("\n");
+    expect(clean).not.toContain("<");
+    expect(clean).not.toContain(">");
+    expect(clean).not.toContain(":");
+    expect(clean.endsWith(".png")).toBe(true);
+  });
+
+  it("safely handles non-ASCII and Urdu script names in ASCII fallback", () => {
+    // Pure Urdu name: "محمد علی"
+    const urduName = "محمد علی.png";
+    const clean = sanitizeAsciiFilename(urduName, "certificate.png");
+    // Since non-ASCII is stripped, fallback should be used cleanly
+    expect(clean).toBe("certificate.png");
+
+    // Mixed English and Urdu name: "Speed Coding - علی خان.png"
+    const mixed = "Speed Coding - علی خان.png";
+    const cleanMixed = sanitizeAsciiFilename(mixed);
+    expect(cleanMixed).toContain("Speed_Coding");
+    expect(cleanMixed.endsWith(".png")).toBe(true);
+  });
+
+  it("caps the ASCII filename length to 60 characters preserving extension", () => {
+    const longName = "A".repeat(100) + ".webp";
+    const clean = sanitizeAsciiFilename(longName);
+    expect(clean.endsWith(".webp")).toBe(true);
+    // Base name length must be <= 60
+    const base = clean.replace(/\.webp$/, "");
+    expect(base.length).toBeLessThanOrEqual(60);
+  });
+
+  it("builds a safe Content-Disposition header with RFC 5987 UTF-8 encoding for Urdu names", () => {
+    const filename = "certificate-hackathon-محمد علی.png";
+    const header = buildContentDispositionHeader(filename);
+
+    // Must start with attachment;
+    expect(header).toMatch(/^attachment;\s*filename="[^"\r\n]+";\s*filename\*=UTF-8''/);
+
+    // ASCII fallback must be quoted and must not contain non-ASCII characters or quotes
+    const asciiMatch = header.match(/filename="([^"]+)"/);
+    expect(asciiMatch).toBeTruthy();
+    const asciiFallback = asciiMatch![1];
+    expect(/^[\x20-\x7E]+$/.test(asciiFallback)).toBe(true);
+    expect(asciiFallback).not.toContain("\r");
+    expect(asciiFallback).not.toContain("\n");
+
+    // filename* must contain percent-encoded Urdu characters
+    expect(header).toContain("filename*=UTF-8''");
+    // Verify encoded Urdu characters exist (percent-encoded %D9%... etc.)
+    expect(header).toMatch(/%D9%[0-9A-Fa-f]{2}/);
+  });
+
+  it("prevents CRLF response header splitting in Content-Disposition", () => {
+    const headerInjection = "cert.png\r\nSet-Cookie: admin=true\r\n";
+    const header = buildContentDispositionHeader(headerInjection);
+    expect(header).not.toContain("\r");
+    expect(header).not.toContain("\n");
   });
 });
