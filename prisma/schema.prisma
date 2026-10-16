@@ -98,6 +98,7 @@ model Event {
   teams         Team[]
   results       Result[]
   feedback      Feedback[]
+  announcements Announcement[]
 
   @@index([status, startsAt])
   @@index([category])
@@ -210,14 +211,21 @@ model Announcement {
   title       String
   body        String   @db.Text
   pinned      Boolean  @default(false)
+  isVisible   Boolean  @default(true)
+  eventId     String?
+  linkUrl     String?
+  linkLabel   String?
   publishedAt DateTime @default(now())
   createdById String
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  createdBy User @relation("AnnouncementCreator", fields: [createdById], references: [id])
+  createdBy User   @relation("AnnouncementCreator", fields: [createdById], references: [id])
+  event     Event? @relation(fields: [eventId], references: [id], onDelete: SetNull)
 
   @@index([pinned, publishedAt])
+  @@index([isVisible, publishedAt])
+  @@index([eventId])
   @@map("announcements")
 }
 

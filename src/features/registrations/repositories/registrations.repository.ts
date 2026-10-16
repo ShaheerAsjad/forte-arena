@@ -21,7 +21,9 @@ export const registrationCardSelect = {
       title: true,
       category: true,
       participationType: true,
+      status: true,
       startsAt: true,
+      endsAt: true,
       registrationDeadline: true,
       venue: true,
       posterUrl: true,
@@ -65,7 +67,9 @@ export type RegistrationCard = {
     title: string;
     category: string;
     participationType: string;
+    status: import("@/lib/db-types").EventStatus;
     startsAt: Date;
+    endsAt: Date | null;
     registrationDeadline: Date;
     venue: string;
     posterUrl: string | null;

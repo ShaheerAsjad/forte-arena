@@ -34,6 +34,7 @@ import {
   Pin,
   Clock,
   Layers,
+  ExternalLink,
 } from "lucide-react";
 import type { EventCategory } from "@/lib/db-types";
 
@@ -232,6 +233,15 @@ export default function HomePage() {
                 Festival Bulletins & Announcements
               </h2>
             </div>
+            <Link
+              href="/announcements"
+              className="group text-xs sm:text-sm font-bold text-navy-800 hover:text-navy-950 inline-flex items-center gap-2 transition-colors"
+            >
+              <span>View All</span>
+              <span className="w-5 h-5 rounded-full bg-navy-100 group-hover:bg-gold-500 group-hover:text-navy-950 inline-flex items-center justify-center transition-all duration-200">
+                <ArrowRight className="w-3 h-3 group-hover:translate-x-0.5 transition-transform" />
+              </span>
+            </Link>
           </div>
         </Reveal>
 
@@ -423,24 +433,47 @@ async function AnnouncementsSection() {
         <StaggerItem key={a.id}>
           <Card
             hoverable
-            className="h-full p-5 space-y-2.5 bg-white border-navy-100 hover:-translate-y-1 hover:border-gold-300/80 transition-all duration-200"
+            className="h-full p-5 space-y-3 bg-white border-navy-100 hover:-translate-y-1 hover:border-gold-300/80 transition-all duration-200 flex flex-col justify-between"
           >
-            <div className="flex items-center justify-between">
-              {a.pinned ? (
-                <span className="inline-flex items-center gap-1 text-[11px] font-bold text-gold-700 bg-gold-50 px-2 py-0.5 rounded-full border border-gold-300">
-                  <Pin className="w-3 h-3" /> Pinned
-                </span>
-              ) : (
-                <span className="text-[11px] text-mist">Notice</span>
-              )}
-              <span className="text-[11px] text-mist">{formatEventDate(a.publishedAt)}</span>
+            <div className="space-y-2.5">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-1.5">
+                  {a.pinned ? (
+                    <span className="inline-flex items-center gap-1 text-[11px] font-bold text-gold-700 bg-gold-50 px-2 py-0.5 rounded-full border border-gold-300">
+                      <Pin className="w-3 h-3" /> Pinned
+                    </span>
+                  ) : (
+                    <span className="text-[11px] text-mist font-medium">Notice</span>
+                  )}
+                  {a.event && (
+                    <span className="text-[10px] font-semibold text-navy-800 bg-navy-50 px-2 py-0.5 rounded-md border border-navy-100 truncate max-w-[130px]">
+                      {a.event.title}
+                    </span>
+                  )}
+                </div>
+                <span className="text-[11px] text-mist">{formatEventDate(a.createdAt)}</span>
+              </div>
+              <h4 className="font-heading text-sm font-bold text-navy-950 line-clamp-2">
+                {a.title}
+              </h4>
+              <p className="text-xs text-ink/80 line-clamp-3 leading-relaxed whitespace-pre-line">
+                {a.body}
+              </p>
             </div>
-            <h4 className="font-heading text-sm font-bold text-navy-950 line-clamp-1">
-              {a.title}
-            </h4>
-            <p className="text-xs text-ink/80 line-clamp-2 leading-relaxed">
-              {a.body}
-            </p>
+
+            {a.linkUrl && a.linkLabel && (
+              <div className="pt-2 border-t border-navy-50">
+                <a
+                  href={a.linkUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 text-xs font-semibold text-navy-900 hover:text-gold-600 transition-colors"
+                >
+                  <span>{a.linkLabel}</span>
+                  <ExternalLink className="w-3 h-3 text-gold-500" />
+                </a>
+              </div>
+            )}
           </Card>
         </StaggerItem>
       ))}

@@ -17,6 +17,7 @@ import {
   CheckCircle2,
   AlertCircle,
   XCircle,
+  Star,
 } from "lucide-react";
 
 const REG_STATUS_BADGES: Record<
@@ -92,7 +93,7 @@ async function AdminOverviewContent() {
       </div>
 
       {/* Stat Cards Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
         {/* Total Events */}
         <Card className="p-6 bg-white border border-navy-100 shadow-sm rounded-2xl flex items-center gap-4 hover:border-gold-300 transition-colors">
           <div className="w-13 h-13 rounded-2xl bg-navy-50 border border-navy-100 flex items-center justify-center text-navy-900 shrink-0">
@@ -133,7 +134,7 @@ async function AdminOverviewContent() {
                 </span>
               )}
             </div>
-            <p className="text-xs text-amber-800/80 mt-1">Awaiting organizer review</p>
+            <p className="text-xs text-amber-800/80 mt-1">Awaiting review</p>
           </div>
         </Card>
 
@@ -155,6 +156,31 @@ async function AdminOverviewContent() {
             <p className="text-xs text-mist mt-1">Confirmed competitors</p>
           </div>
         </Card>
+
+        {/* Participant Rating & Feedback */}
+        <Link href="/admin/feedback" className="block group">
+          <Card className="p-6 bg-white border border-navy-100 shadow-sm rounded-2xl flex items-center gap-4 hover:border-gold-400 group-hover:shadow-md transition-all">
+            <div className="w-13 h-13 rounded-2xl bg-gold-50 border border-gold-200 flex items-center justify-center text-gold-700 shrink-0">
+              <Star className="w-6 h-6 fill-gold-500 text-gold-500" />
+            </div>
+            <div>
+              <p className="text-xs font-bold text-mist uppercase tracking-wider">
+                Average Rating
+              </p>
+              <div className="flex items-baseline gap-2 mt-0.5">
+                <span className="text-3xl font-black font-heading text-navy-950">
+                  {stats.totalFeedback > 0 ? stats.averageRating.toFixed(1) : "—"}
+                </span>
+                <span className="text-xs font-semibold text-gold-600">
+                  {stats.totalFeedback > 0 ? "/ 5.0" : "No reviews"}
+                </span>
+              </div>
+              <p className="text-xs text-mist mt-1">
+                {stats.totalFeedback} {stats.totalFeedback === 1 ? "student review" : "student reviews"}
+              </p>
+            </div>
+          </Card>
+        </Link>
       </div>
 
       {/* Analytics Visualizations: 14-Day Velocity & Category Distribution */}
@@ -286,7 +312,8 @@ export default function AdminPage() {
       fallback={
         <div className="space-y-6 animate-pulse">
           <div className="h-20 bg-navy-100/50 rounded-2xl w-full" />
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+            <div className="h-32 bg-navy-100/50 rounded-2xl" />
             <div className="h-32 bg-navy-100/50 rounded-2xl" />
             <div className="h-32 bg-navy-100/50 rounded-2xl" />
             <div className="h-32 bg-navy-100/50 rounded-2xl" />

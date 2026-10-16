@@ -19,6 +19,7 @@ import {
   type QuickPodiumPayload,
   type ExistingResultItem,
   getAutomaticAwardForPosition,
+  planPodiumSwap,
 } from "@/features/results/results.rules";
 
 async function revalidateResultsPaths(eventSlug?: string, eventId?: string) {
@@ -632,3 +633,84 @@ export async function markEventCompletedAction(
     return { ok: false, error: "Failed to update event status to Completed." };
   }
 }
+
+/**
+ * Swaps positions of two results ranked 1 to 3 in the same event.
+ * Done in ONE transaction using a temporary position above 3 (e.g. 1000)
+ * so the partial unique index results_event_podium_unique_idx is never violated.
+ * Automatic award labels are updated accordingly.
+ */
+export async function swapPodiumResultsAction(
+  eventId: string,
+  resultIdA: string,
+  resultIdB: string
+): Promise<ActionResult<{ swapped: boolean }>> {
+  try {
+    await requireRole(["ORGANIZER", "ADMIN"]);
+
+    const [resultA, resultB] = await Promise.all([
+      prisma.result.findUnique({
+        where: { id: resultIdA },
+        include: { event: { select: { id: true, slug: true } } },
+      }),
+      prisma.result.findUnique({
+        where: { id: resultIdB },
+        include: { event: { select: { id: true, slug: true } } },
+      }),
+    ]);
+
+    if (!resultA || !resultB) {
+      return { ok: false, error: "One or both results were not found." };
+    }
+
+    if (resultA.eventId !== eventId || resultB.eventId !== eventId) {
+      return { ok: false, error: "Both results must belong to this event." };
+    }
+
+    const swapCheck = planPodiumSwap(
+      { id: resultA.id, position: resultA.position, eventId: resultA.eventId },
+      { id: resultB.id, position: resultB.position, eventId: resultB.eventId }
+    );
+
+    if (!swapCheck.valid || !swapCheck.plan) {
+      return { ok: false, error: swapCheck.error || "Invalid podium swap." };
+    }
+
+    const { tempPosition, resultA: planA, resultB: planB } = swapCheck.plan;
+
+    // Execute in ONE atomic transaction
+    await prisma.$transaction(async (tx) => {
+      // Step 1: Move result A to temporary position above 3 (never violates partial unique index)
+      await tx.result.update({
+        where: { id: planA.id },
+        data: { position: tempPosition },
+      });
+
+      // Step 2: Move result B to result A's original position and update its award
+      await tx.result.update({
+        where: { id: planB.id },
+        data: {
+          position: planB.targetPosition,
+          award: planB.targetAward,
+        },
+      });
+
+      // Step 3: Move result A from temp position to result B's original position and update its award
+      await tx.result.update({
+        where: { id: planA.id },
+        data: {
+          position: planA.targetPosition,
+          award: planA.targetAward,
+        },
+      });
+    });
+
+    await revalidateResultsPaths(resultA.event.slug, eventId);
+
+    return { ok: true, data: { swapped: true } };
+  } catch (err) {
+    console.error("swapPodiumResultsAction error:", err);
+    return { ok: false, error: "Failed to swap podium positions. Please retry." };
+  }
+}
+

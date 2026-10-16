@@ -2,7 +2,7 @@
 
 import { useState, useTransition, useId } from "react";
 import { useRouter } from "next/navigation";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
   eventBaseSchema,
@@ -101,13 +101,20 @@ export function EventForm({ initialData, isEdit = false }: EventFormProps) {
     startsAt: formatDateForInput(initialData?.startsAt),
     endsAt: formatDateForInput(initialData?.endsAt),
     registrationDeadline: formatDateForInput(initialData?.registrationDeadline),
-    posterUrl: initialData?.posterUrl ?? "",
   };
+
+  const [fallbackDates] = useState(() => {
+    const now = Date.now();
+    return {
+      startsAt: new Date(now + 7 * 24 * 3600 * 1000),
+      deadline: new Date(now + 5 * 24 * 3600 * 1000),
+    };
+  });
 
   const {
     register,
     handleSubmit,
-    watch,
+    control,
     setValue,
     formState: { errors },
   } = useForm<EventFormValues>({
@@ -116,21 +123,22 @@ export function EventForm({ initialData, isEdit = false }: EventFormProps) {
     mode: "onBlur",
   });
 
-  // Watch form fields for live preview and slug sync
-  const currentTitle = watch("title");
-  const currentSlug = watch("slug");
-  const currentSummary = watch("summary");
-  const currentCategory = watch("category");
-  const currentStatus = watch("status");
-  const currentParticipationType = watch("participationType");
-  const currentMinTeamSize = watch("minTeamSize");
-  const currentMaxTeamSize = watch("maxTeamSize");
-  const currentMaxParticipants = watch("maxParticipants");
-  const currentStartsAt = watch("startsAt");
-  const currentEndsAt = watch("endsAt");
-  const currentDeadline = watch("registrationDeadline");
-  const currentPosterUrl = watch("posterUrl");
-  const currentVenue = watch("venue");
+  // Watch form fields for live preview and slug sync using useWatch
+  const watchedValues = useWatch({ control });
+  const currentTitle = watchedValues?.title ?? defaultValues?.title ?? "";
+  const currentSlug = watchedValues?.slug ?? defaultValues?.slug ?? "";
+  const currentSummary = watchedValues?.summary ?? defaultValues?.summary ?? "";
+  const currentCategory = watchedValues?.category ?? defaultValues?.category;
+  const currentStatus = watchedValues?.status ?? defaultValues?.status;
+  const currentParticipationType = watchedValues?.participationType ?? defaultValues?.participationType;
+  const currentMinTeamSize = watchedValues?.minTeamSize ?? defaultValues?.minTeamSize;
+  const currentMaxTeamSize = watchedValues?.maxTeamSize ?? defaultValues?.maxTeamSize;
+  const currentMaxParticipants = watchedValues?.maxParticipants ?? defaultValues?.maxParticipants;
+  const currentStartsAt = watchedValues?.startsAt ?? defaultValues?.startsAt;
+  const currentEndsAt = watchedValues?.endsAt ?? defaultValues?.endsAt;
+  const currentDeadline = watchedValues?.registrationDeadline ?? defaultValues?.registrationDeadline;
+  const currentPosterUrl = watchedValues?.posterUrl ?? defaultValues?.posterUrl;
+  const currentVenue = watchedValues?.venue ?? defaultValues?.venue;
 
   const handleTitleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value;
@@ -250,11 +258,11 @@ export function EventForm({ initialData, isEdit = false }: EventFormProps) {
     maxParticipants: currentMaxParticipants ? Number(currentMaxParticipants) : null,
     startsAt: currentStartsAt
       ? new Date(currentStartsAt)
-      : new Date(Date.now() + 7 * 24 * 3600 * 1000),
+      : fallbackDates.startsAt,
     endsAt: currentEndsAt ? new Date(currentEndsAt) : null,
     registrationDeadline: currentDeadline
       ? new Date(currentDeadline)
-      : new Date(Date.now() + 5 * 24 * 3600 * 1000),
+      : fallbackDates.deadline,
     posterUrl: currentPosterUrl?.trim() || null,
     venue: currentVenue || "Campus Venue / Arena Stage",
     _count: {
@@ -337,7 +345,7 @@ export function EventForm({ initialData, isEdit = false }: EventFormProps) {
                 <Select
                   label="Category"
                   required
-                  value={watch("category")}
+                  value={currentCategory}
                   onChange={(val) =>
                     setValue("category", val as EventFormValues["category"], {
                       shouldValidate: true,
@@ -359,7 +367,7 @@ export function EventForm({ initialData, isEdit = false }: EventFormProps) {
                 <Select
                   label="Status"
                   required
-                  value={watch("status")}
+                  value={currentStatus}
                   onChange={(val) =>
                     setValue("status", val as EventFormValues["status"], {
                       shouldValidate: true,
@@ -547,7 +555,7 @@ export function EventForm({ initialData, isEdit = false }: EventFormProps) {
                 <Select
                   label="Participation Format"
                   required
-                  value={watch("participationType")}
+                  value={currentParticipationType}
                   onChange={(val) =>
                     setValue(
                       "participationType",

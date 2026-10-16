@@ -9,9 +9,11 @@ import {
   ArrowUpRight,
   Calendar,
   MapPin,
+  Star,
 } from "lucide-react";
 import type { RegistrationCard } from "@/features/registrations/repositories/registrations.repository";
 import type { RegistrationStatus } from "@/lib/db-types";
+import { getEffectiveStatus } from "@/features/events/events.derived";
 
 // ────────────────────────────────────────────────────────────────
 // Status timeline definition
@@ -180,6 +182,23 @@ export function RegistrationCard({ registration }: RegistrationCardProps) {
           >
             <span>View Certificate</span>
             <ArrowUpRight className="w-3.5 h-3.5 text-gold-400" />
+          </Link>
+        </div>
+      )}
+
+      {/* Event Feedback Prompt */}
+      {status === "APPROVED" && getEffectiveStatus(event) === "COMPLETED" && (
+        <div className="flex items-center justify-between p-2.5 rounded-xl bg-gold-50/70 border border-gold-200/80 text-xs">
+          <div className="flex items-center gap-2 text-navy-950 font-medium">
+            <Star className="w-3.5 h-3.5 text-gold-500 fill-gold-500 shrink-0" />
+            <span>How was the competition?</span>
+          </div>
+          <Link
+            href={`/dashboard/${registration.id}#feedback`}
+            className="font-bold text-navy-950 hover:text-gold-700 underline underline-offset-2 flex items-center gap-1 shrink-0"
+          >
+            <span>Rate & review</span>
+            <ArrowUpRight className="w-3 h-3" />
           </Link>
         </div>
       )}

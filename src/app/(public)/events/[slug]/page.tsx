@@ -14,14 +14,17 @@ import { StickyRegisterBar } from "@/features/events/components/StickyRegisterBa
 import { EventsService, type EventWithDerivedStatus } from "@/features/events/services/events.service";
 import type { EventDetailItem } from "@/features/events/repositories/events.repository";
 import { RegistrationsRepository } from "@/features/registrations/repositories/registrations.repository";
+import { AnnouncementsService } from "@/features/announcements/services/announcements.service";
+import { formatEventFullDate, formatEventTime, formatEventDate } from "@/lib/dates";
 import { getSession } from "@/lib/session";
-import { formatEventFullDate, formatEventTime } from "@/lib/dates";
 import {
   Calendar,
   MapPin,
   Users,
   User,
   ArrowLeft,
+  Megaphone,
+  ExternalLink,
 } from "lucide-react";
 
 interface EventDetailPageProps {
@@ -107,7 +110,10 @@ async function EventDetailContent({ params }: EventDetailPageProps) {
   const categoryMeta = CATEGORY_META[item.category] || CATEGORY_META.OTHER;
   const CategoryIcon = categoryMeta.icon;
 
-  const relatedEvents = await EventsService.getRelatedEvents(item.category, item.slug, 3);
+  const [relatedEvents, eventAnnouncements] = await Promise.all([
+    EventsService.getRelatedEvents(item.category, item.slug, 3),
+    AnnouncementsService.getAnnouncementsForEvent(item.id),
+  ]);
 
   return (
     <>
@@ -212,8 +218,56 @@ async function EventDetailContent({ params }: EventDetailPageProps) {
       {/* Main Content & Sticky Registration Column */}
       <section className="max-w-6xl mx-auto px-4 sm:px-6">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-          {/* Left Column: Tabs */}
+          {/* Left Column: Updates + Tabs */}
           <div className="lg:col-span-8 space-y-6">
+            {eventAnnouncements.length > 0 && (
+              <div className="p-5 rounded-2xl bg-gradient-to-r from-gold-50/90 via-white to-navy-50/50 border border-gold-300 shadow-xs space-y-3">
+                <div className="flex items-center gap-2">
+                  <div className="w-6 h-6 rounded-lg bg-gold-500 text-navy-950 flex items-center justify-center font-bold">
+                    <Megaphone className="w-3.5 h-3.5" />
+                  </div>
+                  <h3 className="font-heading text-sm font-bold text-navy-950">
+                    Important Updates & Notices ({eventAnnouncements.length})
+                  </h3>
+                </div>
+                <div className="space-y-3 divide-y divide-navy-100/60">
+                  {eventAnnouncements.map((u) => (
+                    <div key={u.id} className="pt-2.5 first:pt-0 space-y-1">
+                      <div className="flex items-center justify-between gap-2">
+                        <h4 className="text-xs font-bold text-navy-950 flex items-center gap-1.5">
+                          {u.pinned && (
+                            <span className="text-[10px] font-bold text-gold-800 bg-gold-100 px-1.5 py-0.2 rounded border border-gold-300">
+                              PINNED
+                            </span>
+                          )}
+                          <span>{u.title}</span>
+                        </h4>
+                        <span className="text-[10px] text-mist shrink-0">
+                          {formatEventDate(u.createdAt)}
+                        </span>
+                      </div>
+                      <p className="text-xs text-ink/80 leading-relaxed whitespace-pre-line">
+                        {u.body}
+                      </p>
+                      {u.linkUrl && u.linkLabel && (
+                        <div className="pt-1">
+                          <a
+                            href={u.linkUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 text-[11px] font-bold text-gold-700 hover:text-gold-800"
+                          >
+                            <span>{u.linkLabel}</span>
+                            <ExternalLink className="w-3 h-3" />
+                          </a>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <EventDetailTabs
               description={item.description}
               rules={item.rules}

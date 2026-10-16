@@ -391,3 +391,78 @@ export function validateEventPublishability(
 
   return { canPublish: true };
 }
+
+export interface PodiumSwapTarget {
+  id: string;
+  position: number;
+  eventId: string;
+}
+
+export interface PodiumSwapPlan {
+  tempPosition: number;
+  resultA: {
+    id: string;
+    targetPosition: number;
+    targetAward: string;
+  };
+  resultB: {
+    id: string;
+    targetPosition: number;
+    targetAward: string;
+  };
+}
+
+/**
+ * Validates and creates a 3-step swap plan for two results ranked 1..3.
+ * Uses a temporary position above 3 (e.g. 1000) so the partial unique index is never violated.
+ */
+export function planPodiumSwap(
+  first: PodiumSwapTarget,
+  second: PodiumSwapTarget
+): { valid: boolean; error?: string; plan?: PodiumSwapPlan } {
+  if (first.id === second.id) {
+    return { valid: false, error: "Cannot swap a result with itself." };
+  }
+
+  if (first.eventId !== second.eventId) {
+    return { valid: false, error: "Both results must belong to the same event." };
+  }
+
+  if (first.position < 1 || first.position > 3 || second.position < 1 || second.position > 3) {
+    return {
+      valid: false,
+      error: "Podium swap is only allowed between positions 1, 2, and 3.",
+    };
+  }
+
+  if (first.position === second.position) {
+    return {
+      valid: false,
+      error: "Both results currently hold the same rank.",
+    };
+  }
+
+  const targetPosA = second.position;
+  const targetPosB = first.position;
+
+  const targetAwardA = getAutomaticAwardForPosition(targetPosA) || "Podium";
+  const targetAwardB = getAutomaticAwardForPosition(targetPosB) || "Podium";
+
+  return {
+    valid: true,
+    plan: {
+      tempPosition: 1000,
+      resultA: {
+        id: first.id,
+        targetPosition: targetPosA,
+        targetAward: targetAwardA,
+      },
+      resultB: {
+        id: second.id,
+        targetPosition: targetPosB,
+        targetAward: targetAwardB,
+      },
+    },
+  };
+}
+

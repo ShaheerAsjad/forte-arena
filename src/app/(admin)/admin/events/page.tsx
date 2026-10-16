@@ -10,7 +10,7 @@ import { getEffectiveStatus } from "@/features/events/events.derived";
 import { CategoryArtwork } from "@/components/shared/CategoryArtwork";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
-import { Plus, Users, Calendar } from "lucide-react";
+import { Plus, Users, Calendar, Star } from "lucide-react";
 import type { EventStatus } from "@/lib/db-types";
 
 export const metadata = {
@@ -62,6 +62,12 @@ async function AdminEventsContent({
       _count: {
         select: {
           registrations: true,
+          feedback: true,
+        },
+      },
+      feedback: {
+        select: {
+          rating: true,
         },
       },
     },
@@ -129,6 +135,7 @@ async function AdminEventsContent({
                   <th className="py-3 px-3">Participation</th>
                   <th className="py-3 px-3">Schedule</th>
                   <th className="py-3 px-3">Registrations</th>
+                  <th className="py-3 px-3">Feedback</th>
                   <th className="py-3 px-3 text-right">Actions</th>
                 </tr>
               </thead>
@@ -217,6 +224,30 @@ async function AdminEventsContent({
                             </span>
                           )}
                         </div>
+                      </td>
+
+                      {/* Feedback rating & response count */}
+                      <td className="py-3 px-3 whitespace-nowrap">
+                        {event._count.feedback > 0 ? (
+                          <Link
+                            href={`/admin/feedback?eventId=${event.id}`}
+                            className="inline-flex items-center gap-1.5 hover:text-gold-700 transition-colors group"
+                            title="View event feedback"
+                          >
+                            <Star className="w-3.5 h-3.5 fill-gold-500 text-gold-500 shrink-0" />
+                            <span className="font-bold text-navy-950 group-hover:underline">
+                              {(
+                                event.feedback.reduce((sum, f) => sum + f.rating, 0) /
+                                event._count.feedback
+                              ).toFixed(1)}
+                            </span>
+                            <span className="text-[11px] text-mist">
+                              ({event._count.feedback})
+                            </span>
+                          </Link>
+                        ) : (
+                          <span className="text-mist text-[11px]">—</span>
+                        )}
                       </td>
 
                       {/* Actions */}

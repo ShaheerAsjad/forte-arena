@@ -8,6 +8,8 @@ export interface AdminStats {
   publishedEvents: number;
   pendingRegistrations: number;
   approvedParticipants: number;
+  averageRating: number;
+  totalFeedback: number;
 }
 
 export interface DailyRegistrationCount {
@@ -57,25 +59,36 @@ export class AdminRepository {
    */
   static async getAdminStats(): Promise<AdminStats> {
     await connection();
-    const [totalEvents, publishedEvents, pendingRegistrations, approvedRegistrations] =
-      await Promise.all([
-        prisma.event.count(),
-        prisma.event.count({
-          where: { status: "PUBLISHED" },
-        }),
-        prisma.registration.count({
-          where: { status: "PENDING" },
-        }),
-        prisma.registration.count({
-          where: { status: "APPROVED" },
-        }),
-      ]);
+    const [
+      totalEvents,
+      publishedEvents,
+      pendingRegistrations,
+      approvedRegistrations,
+      feedbackAgg,
+    ] = await Promise.all([
+      prisma.event.count(),
+      prisma.event.count({
+        where: { status: "PUBLISHED" },
+      }),
+      prisma.registration.count({
+        where: { status: "PENDING" },
+      }),
+      prisma.registration.count({
+        where: { status: "APPROVED" },
+      }),
+      prisma.feedback.aggregate({
+        _avg: { rating: true },
+        _count: { rating: true },
+      }),
+    ]);
 
     return {
       totalEvents,
       publishedEvents,
       pendingRegistrations,
       approvedParticipants: approvedRegistrations,
+      averageRating: feedbackAgg._avg.rating ?? 0,
+      totalFeedback: feedbackAgg._count.rating ?? 0,
     };
   }
 

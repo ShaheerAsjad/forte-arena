@@ -19,6 +19,7 @@ import {
   PlusCircle,
   ListFilter,
   ShieldCheck,
+  MessageSquareQuote,
 } from "lucide-react";
 
 interface AdminNavTab {
@@ -34,6 +35,7 @@ const ADMIN_PRIMARY_TABS: AdminNavTab[] = [
   { href: "/admin/registrations", label: "Registrations", icon: Users },
   { href: "/admin/results", label: "Results", icon: Trophy },
   { href: "/admin/announcements", label: "Announcements", icon: Megaphone },
+  { href: "/admin/feedback", label: "Feedback", icon: MessageSquareQuote },
 ];
 
 export function AdminShell({ children }: { children: React.ReactNode }) {

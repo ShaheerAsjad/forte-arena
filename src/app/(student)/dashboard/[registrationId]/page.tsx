@@ -17,6 +17,9 @@ import {
   ExternalLink,
 } from "lucide-react";
 import type { RegistrationStatus } from "@/lib/db-types";
+import { getEffectiveStatus } from "@/features/events/events.derived";
+import { FeedbackRepository } from "@/features/feedback/repositories/feedback.repository";
+import { StudentFeedbackCard } from "@/features/feedback/components/StudentFeedbackCard";
 
 interface PageProps {
   params: Promise<{ registrationId: string }>;
@@ -92,6 +95,13 @@ async function RegistrationDetailContent({
   );
 
   if (!registration) notFound();
+
+  const isEventCompleted = getEffectiveStatus(registration.event) === "COMPLETED";
+  const canGiveFeedback = registration.status === "APPROVED" && isEventCompleted;
+
+  const existingFeedback = canGiveFeedback
+    ? await FeedbackRepository.getUserFeedbackForEvent(user.id, registration.event.id)
+    : null;
 
   const timeline = buildTimeline(registration.status);
 
@@ -244,6 +254,15 @@ async function RegistrationDetailContent({
           />
         </div>
       </Card>
+
+      {/* Event Feedback Section */}
+      {canGiveFeedback && (
+        <StudentFeedbackCard
+          eventId={registration.event.id}
+          eventTitle={registration.event.title}
+          initialFeedback={existingFeedback}
+        />
+      )}
 
       {/* Team Members */}
       {registration.team && (

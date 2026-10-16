@@ -15,6 +15,7 @@ import {
   deleteResultAction,
   addQuickPodiumAction,
   addBatchAwardAction,
+  swapPodiumResultsAction,
   publishResultsAction,
   unpublishResultsAction,
   markEventCompletedAction,
@@ -63,6 +64,7 @@ import {
   CheckSquare,
   Square,
   Sparkles,
+  ArrowLeftRight,
 } from "lucide-react";
 
 interface AdminEventResultsManagerProps {
@@ -153,6 +155,7 @@ export function AdminEventResultsManager({
 
   // Status & Certificate Actions state
   const [isPublishing, setIsPublishing] = useState<boolean>(false);
+  const [isSwapping, setIsSwapping] = useState<boolean>(false);
   const [uploadingCertId, setUploadingCertId] = useState<string | null>(null);
   const [removingCertId, setRemovingCertId] = useState<string | null>(null);
   const [, setCertErrors] = useState<Record<string, string>>({});
@@ -563,6 +566,23 @@ export function AdminEventResultsManager({
       setBatchError("An unexpected error occurred while saving batch awards.");
     } finally {
       setIsSubmittingBatch(false);
+    }
+  };
+
+  const handleSwapPodium = async (idA: string, idB: string) => {
+    setIsSwapping(true);
+    try {
+      const res = await swapPodiumResultsAction(event.id, idA, idB);
+      if (!res.ok) {
+        toast.error(res.error);
+        return;
+      }
+      toast.success("Podium positions swapped successfully!");
+      window.location.reload();
+    } catch {
+      toast.error("Failed to swap podium positions.");
+    } finally {
+      setIsSwapping(false);
     }
   };
 
@@ -1560,6 +1580,50 @@ export function AdminEventResultsManager({
               </h3>
               <span className="text-xs text-mist">Sorted by rank</span>
             </div>
+
+            {/* Quick Podium Swap Bar (only visible when at least 2 podium positions are assigned) */}
+            {((existingFirst && existingSecond) ||
+              (existingSecond && existingThird) ||
+              (existingFirst && existingThird)) && (
+              <div className="p-3 bg-navy-50/70 border border-navy-100 rounded-xl flex flex-wrap items-center justify-between gap-2.5 text-xs">
+                <div className="flex items-center gap-1.5 font-bold text-navy-950">
+                  <ArrowLeftRight className="w-3.5 h-3.5 text-gold-500" />
+                  <span>Swap Podium Ranks:</span>
+                </div>
+                <div className="flex flex-wrap items-center gap-1.5">
+                  {existingFirst && existingSecond && (
+                    <button
+                      type="button"
+                      disabled={isSwapping}
+                      onClick={() => handleSwapPodium(existingFirst.id, existingSecond.id)}
+                      className="px-2.5 py-1 rounded-lg bg-white border border-navy-200 text-navy-900 font-semibold hover:bg-gold-50 hover:border-gold-300 transition-colors cursor-pointer text-[11px] disabled:opacity-50"
+                    >
+                      Swap 1st & 2nd
+                    </button>
+                  )}
+                  {existingSecond && existingThird && (
+                    <button
+                      type="button"
+                      disabled={isSwapping}
+                      onClick={() => handleSwapPodium(existingSecond.id, existingThird.id)}
+                      className="px-2.5 py-1 rounded-lg bg-white border border-navy-200 text-navy-900 font-semibold hover:bg-gold-50 hover:border-gold-300 transition-colors cursor-pointer text-[11px] disabled:opacity-50"
+                    >
+                      Swap 2nd & 3rd
+                    </button>
+                  )}
+                  {existingFirst && existingThird && (
+                    <button
+                      type="button"
+                      disabled={isSwapping}
+                      onClick={() => handleSwapPodium(existingFirst.id, existingThird.id)}
+                      className="px-2.5 py-1 rounded-lg bg-white border border-navy-200 text-navy-900 font-semibold hover:bg-gold-50 hover:border-gold-300 transition-colors cursor-pointer text-[11px] disabled:opacity-50"
+                    >
+                      Swap 1st & 3rd
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
 
             {results.length === 0 ? (
               <Card className="p-12 text-center text-mist bg-white rounded-2xl border border-navy-100 space-y-2">

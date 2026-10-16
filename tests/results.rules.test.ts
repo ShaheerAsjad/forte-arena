@@ -7,6 +7,7 @@ import {
   validateQuickPodiumPayload,
   validateBatchAwardPayload,
   validateEventPublishability,
+  planPodiumSwap,
   type ExistingResultItem,
   type QuickPodiumPayload,
 } from "@/features/results/results.rules";
@@ -357,3 +358,56 @@ describe("Results Rules: Event Publishability", () => {
     expect(result.error).toBeUndefined();
   });
 });
+
+describe("Results Rules: Podium Swap Plan (Positions 1-3)", () => {
+  const result1 = { id: "res-1", position: 1, eventId: "evt-1" };
+  const result2 = { id: "res-2", position: 2, eventId: "evt-1" };
+  const result3 = { id: "res-3", position: 3, eventId: "evt-1" };
+  const result4 = { id: "res-4", position: 4, eventId: "evt-1" };
+  const resultOtherEvent = { id: "res-diff", position: 2, eventId: "evt-99" };
+
+  it("plans swap between 1st place and 2nd place with temporary position", () => {
+    const swap = planPodiumSwap(result1, result2);
+    expect(swap.valid).toBe(true);
+    expect(swap.plan).toBeDefined();
+    expect(swap.plan?.tempPosition).toBe(1000);
+
+    // Result 1 moves to 2nd place with "Runner-up"
+    expect(swap.plan?.resultA.id).toBe("res-1");
+    expect(swap.plan?.resultA.targetPosition).toBe(2);
+    expect(swap.plan?.resultA.targetAward).toBe("Runner-up");
+
+    // Result 2 moves to 1st place with "Champion"
+    expect(swap.plan?.resultB.id).toBe("res-2");
+    expect(swap.plan?.resultB.targetPosition).toBe(1);
+    expect(swap.plan?.resultB.targetAward).toBe("Champion");
+  });
+
+  it("plans swap between 2nd place and 3rd place", () => {
+    const swap = planPodiumSwap(result2, result3);
+    expect(swap.valid).toBe(true);
+    expect(swap.plan?.resultA.targetPosition).toBe(3);
+    expect(swap.plan?.resultA.targetAward).toBe("Second Runner-up");
+    expect(swap.plan?.resultB.targetPosition).toBe(2);
+    expect(swap.plan?.resultB.targetAward).toBe("Runner-up");
+  });
+
+  it("rejects swapping a result with itself", () => {
+    const swap = planPodiumSwap(result1, result1);
+    expect(swap.valid).toBe(false);
+    expect(swap.error).toContain("Cannot swap a result with itself");
+  });
+
+  it("rejects swapping results from different events", () => {
+    const swap = planPodiumSwap(result1, resultOtherEvent);
+    expect(swap.valid).toBe(false);
+    expect(swap.error).toContain("must belong to the same event");
+  });
+
+  it("rejects swapping when one of the positions is 4 or higher", () => {
+    const swap = planPodiumSwap(result1, result4);
+    expect(swap.valid).toBe(false);
+    expect(swap.error).toContain("Podium swap is only allowed between positions 1, 2, and 3");
+  });
+});
+
