@@ -20,12 +20,25 @@ const inter = Inter({
   weight: ["400", "500", "600", "700"],
 });
 
+const appUrl =
+  process.env.NEXT_PUBLIC_APP_URL ||
+  (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000");
+
 export const metadata: Metadata = {
+  metadataBase: new URL(appUrl),
   title: {
     default: APP_NAME,
     template: `%s | ${APP_NAME}`,
   },
   description: APP_DESCRIPTION,
+  openGraph: {
+    title: APP_NAME,
+    description: APP_DESCRIPTION,
+    url: appUrl,
+    siteName: APP_NAME,
+    locale: "en_US",
+    type: "website",
+  },
 };
 
 export default function RootLayout({
