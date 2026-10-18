@@ -61,6 +61,7 @@ model User {
   reviewedRegistrations Registration[] @relation("RegistrationReviewer")
   feedback              Feedback[]
   announcements         Announcement[] @relation("AnnouncementCreator")
+  attendedRegistrations Registration[] @relation("RegistrationAttendant")
 
   sessions Session[]
   accounts Account[]
@@ -117,6 +118,9 @@ model Registration {
   withdrawCount   Int                @default(0)
   reviewedById    String?
   reviewedAt      DateTime?
+  checkInToken    String?            @unique
+  attendedAt      DateTime?
+  attendedById    String?
   createdAt       DateTime           @default(now())
   updatedAt       DateTime           @updatedAt
 
@@ -124,10 +128,12 @@ model Registration {
   user       User    @relation(fields: [userId], references: [id], onDelete: Cascade)
   team       Team?   @relation(fields: [teamId], references: [id], onDelete: SetNull)
   reviewedBy User?   @relation("RegistrationReviewer", fields: [reviewedById], references: [id])
+  attendedBy User?   @relation("RegistrationAttendant", fields: [attendedById], references: [id])
   result     Result?
 
   @@unique([eventId, userId])
   @@index([eventId, status])
+  @@index([eventId, attendedAt])
   @@index([userId])
   @@map("registrations")
 }

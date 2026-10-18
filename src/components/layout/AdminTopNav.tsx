@@ -12,10 +12,12 @@ import {
   Trophy,
   Megaphone,
   Home,
+  QrCode,
 } from "lucide-react";
 
 const ADMIN_TABS = [
   { href: "/admin", label: "Overview", icon: LayoutDashboard },
+  { href: "/admin/scan", label: "Scan Entry", icon: QrCode },
   { href: "/admin/events", label: "Events", icon: CalendarDays },
   { href: "/admin/registrations", label: "Registrations", icon: Users },
   { href: "/admin/results", label: "Results", icon: Trophy },

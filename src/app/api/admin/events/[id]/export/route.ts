@@ -70,6 +70,8 @@ export async function GET(
       "Phone",
       "Team Members (Name [Roll])",
       "Status",
+      "Attended",
+      "Attended At",
       "Attempt Count",
       "Submitted Date",
       "Notes / Rejection Reason",
@@ -90,6 +92,8 @@ export async function GET(
         : "";
 
       const submittedAt = new Date(reg.createdAt).toISOString();
+      const attended = reg.attendedAt ? "Yes" : "No";
+      const attendedAtStr = reg.attendedAt ? new Date(reg.attendedAt).toISOString() : "";
       const notes = reg.notes || reg.rejectionReason || "";
 
       return [
@@ -103,6 +107,8 @@ export async function GET(
         phone,
         membersList,
         reg.status,
+        attended,
+        attendedAtStr,
         reg.attemptCount,
         submittedAt,
         notes,

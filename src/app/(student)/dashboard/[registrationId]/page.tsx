@@ -15,11 +15,13 @@ import {
   XCircle,
   Clock,
   ExternalLink,
+  QrCode,
 } from "lucide-react";
 import type { RegistrationStatus } from "@/lib/db-types";
 import { getEffectiveStatus } from "@/features/events/events.derived";
 import { FeedbackRepository } from "@/features/feedback/repositories/feedback.repository";
 import { StudentFeedbackCard } from "@/features/feedback/components/StudentFeedbackCard";
+import { formatTime24 } from "@/lib/dates";
 
 interface PageProps {
   params: Promise<{ registrationId: string }>;
@@ -150,6 +152,38 @@ async function RegistrationDetailContent({
             })}
           </span>
         </div>
+
+        {/* QR Entry Pass CTA for Approved Registrations */}
+        {registration.status === "APPROVED" && (
+          <div className="p-4 rounded-2xl bg-gradient-to-r from-navy-950 via-navy-900 to-navy-950 border border-gold-400/40 flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-ivory shadow-sm">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-gold-400 text-navy-950 flex items-center justify-center font-heading font-black text-sm shrink-0 shadow-xs">
+                <QrCode className="w-5 h-5" />
+              </div>
+              <div>
+                <p className="text-xs font-bold uppercase tracking-wider text-gold-400">
+                  Event Day Check-In
+                </p>
+                <p className="font-heading text-base font-extrabold text-ivory">
+                  Official QR Entry Pass
+                </p>
+                <p className="text-xs text-mist/90">
+                  {registration.attendedAt
+                    ? `Checked in at ${formatTime24(registration.attendedAt)}`
+                    : "Have your QR pass ready on your device for entry."}
+                </p>
+              </div>
+            </div>
+
+            <Link
+              href={`/dashboard/pass/${registration.id}`}
+              className="inline-flex items-center justify-center gap-2 px-4 py-2.5 text-xs font-bold rounded-xl bg-gold-400 hover:bg-gold-300 text-navy-950 transition-colors shadow-xs shrink-0 font-heading"
+            >
+              <QrCode className="w-4 h-4" />
+              <span>Show QR Pass</span>
+            </Link>
+          </div>
+        )}
 
         {/* Published Result & Certificate */}
         {registration.event.resultsPublished && registration.result && (

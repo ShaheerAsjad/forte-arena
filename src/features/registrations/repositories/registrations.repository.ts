@@ -11,6 +11,8 @@ import { assertRollNumbersAvailable } from "../registrations.rules";
 export const registrationCardSelect = {
   id: true,
   status: true,
+  checkInToken: true,
+  attendedAt: true,
   createdAt: true,
   updatedAt: true,
   rejectionReason: true,
@@ -58,6 +60,8 @@ export const registrationCardSelect = {
 export type RegistrationCard = {
   id: string;
   status: RegistrationStatus;
+  checkInToken?: string | null;
+  attendedAt?: Date | null;
   createdAt: Date;
   updatedAt: Date;
   rejectionReason: string | null;

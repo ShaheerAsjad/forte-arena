@@ -64,6 +64,19 @@ export function formatEventTime(date: Date | string): string {
 }
 
 /**
+ * Format time in 24-hour HH:mm, e.g., "14:30", using APP_TIMEZONE
+ */
+export function formatTime24(date: Date | string): string {
+  const d = toDate(date);
+  return new Intl.DateTimeFormat("en-GB", {
+    timeZone: TIMEZONE,
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(d);
+}
+
+/**
  * Format deadline with hour and minute, e.g., "Oct 22, 2026 • 11:59 PM"
  */
 export function formatDeadline(date: Date | string): string {

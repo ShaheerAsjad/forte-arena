@@ -6,6 +6,8 @@ import {
   approveRegistrationAction,
   rejectRegistrationAction,
 } from "@/features/admin/registrations.actions";
+import { undoCheckInAction } from "@/features/attendance/attendance.actions";
+import { formatTime24 } from "@/lib/dates";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Select } from "@/components/ui/Select";
@@ -26,11 +28,15 @@ import {
   ChevronDown,
   ChevronUp,
   Calendar,
+  RotateCcw,
 } from "lucide-react";
 
 export interface RegistrationReviewItem {
   id: string;
   status: "PENDING" | "APPROVED" | "REJECTED" | "WITHDRAWN";
+  checkInToken?: string | null;
+  attendedAt?: Date | string | null;
+  attendedById?: string | null;
   attemptCount: number;
   withdrawCount: number;
   notes: string | null;
@@ -132,6 +138,29 @@ export function RegistrationsReviewCards({
   const [rejectingReg, setRejectingReg] = useState<RegistrationReviewItem | null>(null);
   const [rejectReason, setRejectReason] = useState("");
 
+  // Undo check-in modal state
+  const [undoTarget, setUndoTarget] = useState<RegistrationReviewItem | null>(null);
+  const [isUndoing, startUndoTransition] = useTransition();
+
+  const handleUndoSubmit = () => {
+    if (!undoTarget) return;
+
+    startUndoTransition(async () => {
+      try {
+        const res = await undoCheckInAction({ registrationId: undoTarget.id });
+        if (res.ok) {
+          toast.success(`Check-in undone for ${undoTarget.user.name}`);
+          setUndoTarget(null);
+          router.refresh();
+        } else {
+          toast.error(res.error);
+        }
+      } catch {
+        toast.error("Failed to undo check-in.");
+      }
+    });
+  };
+
   const handleCopy = (text: string, label: string, key: string) => {
     if (!text) return;
     navigator.clipboard.writeText(text);
@@ -208,6 +237,7 @@ export function RegistrationsReviewCards({
       ALL: eventFiltered.length,
       PENDING: eventFiltered.filter((r) => r.status === "PENDING").length,
       APPROVED: eventFiltered.filter((r) => r.status === "APPROVED").length,
+      ATTENDED: eventFiltered.filter((r) => Boolean(r.attendedAt)).length,
       REJECTED: eventFiltered.filter((r) => r.status === "REJECTED").length,
       WITHDRAWN: eventFiltered.filter((r) => r.status === "WITHDRAWN").length,
     };
@@ -242,7 +272,9 @@ export function RegistrationsReviewCards({
   const filteredRegistrations = useMemo(() => {
     return eventFiltered.filter((reg) => {
       // 1. Status Filter
-      if (statusFilter !== "ALL" && reg.status !== statusFilter) {
+      if (statusFilter === "ATTENDED") {
+        if (!reg.attendedAt) return false;
+      } else if (statusFilter !== "ALL" && reg.status !== statusFilter) {
         return false;
       }
 
@@ -339,6 +371,7 @@ export function RegistrationsReviewCards({
                 { key: "ALL", label: "All" },
                 { key: "PENDING", label: "Pending" },
                 { key: "APPROVED", label: "Approved" },
+                { key: "ATTENDED", label: "Attended" },
                 { key: "REJECTED", label: "Rejected" },
                 { key: "WITHDRAWN", label: "Withdrawn" },
               ] as const
@@ -554,15 +587,25 @@ export function RegistrationsReviewCards({
                     </div>
                   </div>
 
-                  {/* Right Badges: Status Pill + Attempt Badge */}
+                  {/* Right Badges: Status Pill + Attended Badge + Attempt Badge */}
                   <div className="flex flex-wrap sm:flex-col items-start sm:items-end gap-2 shrink-0 self-start">
-                    {/* Status Pill */}
-                    <span
-                      className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border shadow-2xs ${statusMeta.pillClass}`}
-                    >
-                      <StatusIcon className="w-3.5 h-3.5 shrink-0" />
-                      <span>{statusMeta.label}</span>
-                    </span>
+                    {/* Status Pill & Attended Badge */}
+                    <div className="flex items-center gap-1.5 flex-wrap justify-end">
+                      {reg.attendedAt && (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-800 border border-emerald-300 shadow-2xs">
+                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                          <span>
+                            Attended · {formatTime24(reg.attendedAt)}
+                          </span>
+                        </span>
+                      )}
+                      <span
+                        className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border shadow-2xs ${statusMeta.pillClass}`}
+                      >
+                        <StatusIcon className="w-3.5 h-3.5 shrink-0" />
+                        <span>{statusMeta.label}</span>
+                      </span>
+                    </div>
 
                     {/* Attempt X of 2 Badge */}
                     <div className="flex items-center gap-1.5">
@@ -750,6 +793,17 @@ export function RegistrationsReviewCards({
                           <CheckCircle2 className="w-4 h-4 text-emerald-600" />
                           <span>Approved Application</span>
                         </span>
+                        {reg.attendedAt && (
+                          <button
+                            type="button"
+                            onClick={() => setUndoTarget(reg)}
+                            className="inline-flex items-center gap-1 text-xs font-semibold text-rose-700 hover:text-rose-900 bg-rose-50 hover:bg-rose-100 px-2.5 py-1 rounded-lg border border-rose-200 transition cursor-pointer"
+                            title="Undo check-in"
+                          >
+                            <RotateCcw className="w-3 h-3" />
+                            <span>Undo Check-in</span>
+                          </button>
+                        )}
                         <button
                           type="button"
                           onClick={() => {
@@ -865,6 +919,53 @@ export function RegistrationsReviewCards({
                   <XCircle className="w-3.5 h-3.5 mr-1" />
                 )}
                 <span>Confirm Rejection</span>
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Undo Check-In Confirmation Modal */}
+      {undoTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-navy-950/50 backdrop-blur-xs animate-in fade-in duration-150">
+          <div className="w-full max-w-sm bg-white rounded-3xl p-6 border border-navy-100 shadow-2xl space-y-4">
+            <div className="w-10 h-10 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center border border-rose-200">
+              <RotateCcw className="w-5 h-5" />
+            </div>
+
+            <div className="space-y-1">
+              <h3 className="text-base font-bold text-navy-950 font-heading">
+                Undo Attendance Check-In?
+              </h3>
+              <p className="text-xs text-mist leading-relaxed">
+                Are you sure you want to revert check-in for{" "}
+                <strong className="text-navy-900">{undoTarget.user.name}</strong>?
+                Their attendance record will be cleared.
+              </p>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-navy-100">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setUndoTarget(null)}
+                disabled={isUndoing}
+                className="text-xs"
+              >
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                onClick={handleUndoSubmit}
+                disabled={isUndoing}
+                className="text-xs bg-rose-600 hover:bg-rose-700 text-white font-bold"
+              >
+                {isUndoing ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" />
+                ) : null}
+                Confirm Undo
               </Button>
             </div>
           </div>

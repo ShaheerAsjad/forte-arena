@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Card } from "@/components/ui/Card";
 import { WithdrawButton } from "@/features/registrations/WithdrawButton";
+import { formatTime24 } from "@/lib/dates";
 import {
   Circle,
   CheckCircle2,
@@ -10,6 +11,7 @@ import {
   Calendar,
   MapPin,
   Star,
+  QrCode,
 } from "lucide-react";
 import type { RegistrationCard } from "@/features/registrations/repositories/registrations.repository";
 import type { RegistrationStatus } from "@/lib/db-types";
@@ -142,11 +144,19 @@ export function RegistrationCard({ registration }: RegistrationCardProps) {
           </div>
         </div>
 
-        <span
-          className={`shrink-0 inline-block px-2.5 py-1 rounded-full text-[10px] font-bold border ${STATUS_STYLES[status]}`}
-        >
-          {status}
-        </span>
+        <div className="flex items-center gap-1.5 shrink-0">
+          {registration.attendedAt && (
+            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-emerald-50 text-emerald-800 border border-emerald-300">
+              <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+              <span>Attended</span>
+            </span>
+          )}
+          <span
+            className={`inline-block px-2.5 py-1 rounded-full text-[10px] font-bold border ${STATUS_STYLES[status]}`}
+          >
+            {status}
+          </span>
+        </div>
       </div>
 
       {/* Team name if applicable */}
@@ -159,6 +169,35 @@ export function RegistrationCard({ registration }: RegistrationCardProps) {
 
       {/* Timeline */}
       <StatusTimeline status={status} />
+
+      {/* QR Entry Pass CTA for Approved Registrations */}
+      {status === "APPROVED" && (
+        <div className="p-3.5 rounded-xl bg-gradient-to-r from-navy-950 to-navy-900 border border-gold-400/30 flex items-center justify-between gap-3 text-ivory shadow-xs">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="w-8 h-8 rounded-lg bg-gold-400 text-navy-950 flex items-center justify-center font-heading font-black text-xs shrink-0 shadow-xs">
+              <QrCode className="w-4 h-4" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-xs font-extrabold text-ivory truncate">
+                Official Entry Pass
+              </p>
+              <p className="text-[10px] text-mist/90">
+                {registration.attendedAt
+                  ? `Checked in at ${formatTime24(registration.attendedAt)}`
+                  : "Show QR code at venue entrance"}
+              </p>
+            </div>
+          </div>
+
+          <Link
+            href={`/dashboard/pass/${registration.id}`}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg bg-gold-400 hover:bg-gold-300 text-navy-950 transition-colors shadow-2xs shrink-0 font-heading"
+          >
+            <QrCode className="w-3.5 h-3.5" />
+            <span>Show QR Pass</span>
+          </Link>
+        </div>
+      )}
 
       {/* Published Result & Certificate */}
       {event.resultsPublished && registration.result && (
