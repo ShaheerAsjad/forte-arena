@@ -9,6 +9,7 @@ import { z } from "zod";
 import { toast } from "sonner";
 import { signIn } from "@/lib/auth-client";
 import { APP_NAME } from "@/config/app";
+import { PasswordInput } from "@/components/ui/PasswordInput";
 
 const loginSchema = z.object({
   email: z.string().email("Please enter a valid email address"),
@@ -97,9 +98,8 @@ function LoginForm() {
           >
             Password
           </label>
-          <input
+          <PasswordInput
             id="password"
-            type="password"
             autoComplete="current-password"
             disabled={loading}
             {...register("password")}

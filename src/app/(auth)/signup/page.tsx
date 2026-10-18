@@ -9,6 +9,7 @@ import { z } from "zod";
 import { toast } from "sonner";
 import { signUp } from "@/lib/auth-client";
 import { APP_NAME } from "@/config/app";
+import { PasswordInput } from "@/components/ui/PasswordInput";
 
 const signupSchema = z
   .object({
@@ -130,9 +131,8 @@ function SignupForm() {
           >
             Password
           </label>
-          <input
+          <PasswordInput
             id="password"
-            type="password"
             autoComplete="new-password"
             disabled={loading}
             {...register("password")}
@@ -153,9 +153,8 @@ function SignupForm() {
           >
             Confirm Password
           </label>
-          <input
+          <PasswordInput
             id="confirmPassword"
-            type="password"
             autoComplete="new-password"
             disabled={loading}
             {...register("confirmPassword")}

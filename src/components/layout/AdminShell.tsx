@@ -15,11 +15,11 @@ import {
   Megaphone,
   Menu,
   X,
-  ExternalLink,
   PlusCircle,
   ListFilter,
   ShieldCheck,
   MessageSquareQuote,
+  Home,
 } from "lucide-react";
 
 interface AdminNavTab {
@@ -141,7 +141,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
               <Menu className="w-5 h-5" />
             </button>
 
-            <Logo size="sm" href="/admin" />
+            <Logo size="sm" href="/" />
 
             <div className="hidden sm:flex items-center gap-1.5 ml-1">
               <span className="text-[10px] font-extrabold uppercase tracking-widest text-navy-950 bg-navy-100/90 border border-navy-200/80 px-2.5 py-0.5 rounded-full">
@@ -158,10 +158,10 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
 
             <Link
               href="/"
-              className="inline-flex items-center gap-1 text-xs font-semibold text-mist hover:text-navy-900 px-2.5 py-1.5 rounded-xl hover:bg-navy-50/70 transition"
+              className="inline-flex items-center gap-1.5 text-xs font-semibold text-navy-700 hover:text-navy-950 px-2.5 py-1.5 rounded-xl hover:bg-navy-50 transition"
             >
-              <span>Public Site</span>
-              <ExternalLink className="w-3.5 h-3.5 text-mist-light" />
+              <Home className="w-3.5 h-3.5 text-gold-600" />
+              <span>Back to Home</span>
             </Link>
 
             <div className="h-4 w-px bg-navy-200/60 hidden sm:block" />
@@ -225,14 +225,24 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
           </div>
 
           {/* Sidebar Footer info */}
-          <div className="p-3 rounded-2xl bg-navy-50/70 border border-navy-100 text-xs space-y-1">
-            <div className="flex items-center gap-2 text-navy-950 font-bold text-[11px]">
-              <ShieldCheck className="w-4 h-4 text-emerald-600" />
-              <span>Organizer Session</span>
+          <div className="space-y-2">
+            <Link
+              href="/"
+              className="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold text-navy-700 hover:text-navy-950 hover:bg-navy-50/80 transition-colors"
+            >
+              <Home className="w-4 h-4 text-gold-600" />
+              <span>Back to Home</span>
+            </Link>
+
+            <div className="p-3 rounded-2xl bg-navy-50/70 border border-navy-100 text-xs space-y-1">
+              <div className="flex items-center gap-2 text-navy-950 font-bold text-[11px]">
+                <ShieldCheck className="w-4 h-4 text-emerald-600" />
+                <span>Organizer Session</span>
+              </div>
+              <p className="text-[10px] text-mist leading-relaxed">
+                Administrative permissions active. Changes affect live events.
+              </p>
             </div>
-            <p className="text-[10px] text-mist leading-relaxed">
-              Administrative permissions active. Changes affect live events.
-            </p>
           </div>
         </aside>
 
@@ -263,7 +273,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
                   {/* Drawer Header */}
                   <div className="flex items-center justify-between pb-3 border-b border-navy-100">
                     <div className="flex items-center gap-2">
-                      <Logo size="sm" href="/admin" />
+                      <Logo size="sm" href="/" />
                       <span className="text-[10px] font-extrabold uppercase tracking-wider text-navy-950 bg-navy-100 px-2 py-0.5 rounded-full">
                         ORGANIZER
                       </span>
@@ -316,10 +326,10 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
                   <Link
                     href="/"
                     onClick={() => setIsDrawerOpen(false)}
-                    className="flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold text-mist hover:text-navy-950 hover:bg-navy-50 transition"
+                    className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold text-navy-700 hover:text-navy-950 hover:bg-navy-50 transition"
                   >
-                    <span>View Public Campus Site</span>
-                    <ExternalLink className="w-3.5 h-3.5" />
+                    <Home className="w-4 h-4 text-gold-600" />
+                    <span>Back to Home</span>
                   </Link>
                 </div>
               </motion.div>

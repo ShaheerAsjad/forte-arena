@@ -1,10 +1,11 @@
 import { Suspense } from "react";
+import Link from "next/link";
 import { requireUser } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 import { ProfileForm } from "@/features/users/ProfileForm";
 import { ChangePasswordForm } from "@/features/users/ChangePasswordForm";
 import { Card } from "@/components/ui/Card";
-import { UserCircle } from "lucide-react";
+import { UserCircle, Home } from "lucide-react";
 
 async function ProfileContent() {
   const user = await requireUser("/login?next=/profile");
@@ -33,7 +34,7 @@ async function ProfileContent() {
 
   return (
     <div className="max-w-xl mx-auto space-y-8">
-      <header className="space-y-1">
+      <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-navy-100">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-2xl bg-navy-100 flex items-center justify-center">
             <UserCircle className="w-5 h-5 text-navy-700" />
@@ -46,6 +47,21 @@ async function ProfileContent() {
               This information is shown to event organisers.
             </p>
           </div>
+        </div>
+        <div className="flex items-center gap-3">
+          <Link
+            href="/"
+            className="inline-flex items-center gap-1.5 text-sm font-semibold text-navy-700 hover:text-navy-950 transition"
+          >
+            <Home className="w-4 h-4 text-gold-600" />
+            Home
+          </Link>
+          <Link
+            href="/dashboard"
+            className="inline-flex items-center gap-1.5 text-sm font-semibold text-navy-700 hover:text-navy-950 transition"
+          >
+            Dashboard
+          </Link>
         </div>
       </header>
 

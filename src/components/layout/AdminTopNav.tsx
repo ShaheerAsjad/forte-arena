@@ -11,6 +11,7 @@ import {
   Users,
   Trophy,
   Megaphone,
+  Home,
 } from "lucide-react";
 
 const ADMIN_TABS = [
@@ -30,7 +31,7 @@ export function AdminTopNav() {
         {/* Upper Top Bar: Logo & User Control */}
         <div className="flex items-center justify-between py-3.5 border-b border-navy-50">
           <div className="flex items-center gap-3">
-            <Logo size="sm" href="/admin" />
+            <Logo size="sm" href="/" />
             <span className="text-xs px-2.5 py-0.5 rounded-full bg-navy-100 text-navy-900 font-bold uppercase tracking-wider">
               Organizer Console
             </span>
@@ -38,9 +39,10 @@ export function AdminTopNav() {
           <div className="flex items-center gap-3">
             <Link
               href="/"
-              className="text-xs font-semibold text-mist hover:text-navy-900 transition hidden sm:inline"
+              className="text-xs font-semibold text-navy-700 hover:text-navy-950 transition hidden sm:inline-flex items-center gap-1.5"
             >
-              Public Site →
+              <Home className="w-3.5 h-3.5 text-gold-600" />
+              <span>Back to Home</span>
             </Link>
             <SignOutButton />
           </div>

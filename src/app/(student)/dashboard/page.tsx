@@ -4,9 +4,10 @@ import { requireUser } from "@/lib/session";
 import { RegistrationsRepository } from "@/features/registrations/repositories/registrations.repository";
 import { DashboardTabs } from "@/features/registrations/DashboardTabs";
 import { SignOutButton } from "./SignOutButton";
+import { Logo } from "@/components/shared/Logo";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
-import { Trophy, UserCircle } from "lucide-react";
+import { Trophy, UserCircle, Home } from "lucide-react";
 
 async function DashboardContent() {
   const user = await requireUser("/login?next=/dashboard");
@@ -23,16 +24,27 @@ async function DashboardContent() {
     <div className="space-y-8">
       {/* Header */}
       <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-navy-100">
-        <div>
-          <h1 className="text-3xl font-extrabold text-navy-950 font-heading tracking-tight">
-            My Dashboard
-          </h1>
-          <p className="text-mist mt-1 text-sm">
-            Welcome back,{" "}
-            <span className="font-semibold text-navy-900">{user.name}</span>
-          </p>
+        <div className="flex items-center gap-4">
+          <Logo size="md" href="/" />
+          <div className="h-8 w-px bg-navy-200/60 hidden sm:block" />
+          <div>
+            <h1 className="text-3xl font-extrabold text-navy-950 font-heading tracking-tight">
+              My Dashboard
+            </h1>
+            <p className="text-mist mt-0.5 text-sm">
+              Welcome back,{" "}
+              <span className="font-semibold text-navy-900">{user.name}</span>
+            </p>
+          </div>
         </div>
         <div className="flex items-center gap-3">
+          <Link
+            href="/"
+            className="inline-flex items-center gap-1.5 text-sm font-semibold text-navy-700 hover:text-navy-950 transition"
+          >
+            <Home className="w-4 h-4 text-gold-600" />
+            Home
+          </Link>
           <Link
             href="/profile"
             className="inline-flex items-center gap-1.5 text-sm font-semibold text-navy-700 hover:text-navy-950 transition"
