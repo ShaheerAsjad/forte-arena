@@ -2,22 +2,34 @@ import { Suspense } from "react";
 import { requireUser } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 import { ProfileForm } from "@/features/users/ProfileForm";
+import { ChangePasswordForm } from "@/features/users/ChangePasswordForm";
 import { Card } from "@/components/ui/Card";
 import { UserCircle } from "lucide-react";
 
 async function ProfileContent() {
   const user = await requireUser("/login?next=/profile");
 
-  const dbUser = await prisma.user.findUnique({
-    where: { id: user.id },
-    select: {
-      name: true,
-      email: true,
-      rollNumber: true,
-      department: true,
-      phone: true,
-    },
-  });
+  const [dbUser, credentialAccount] = await Promise.all([
+    prisma.user.findUnique({
+      where: { id: user.id },
+      select: {
+        name: true,
+        email: true,
+        rollNumber: true,
+        department: true,
+        phone: true,
+      },
+    }),
+    prisma.account.findFirst({
+      where: {
+        userId: user.id,
+        password: { not: null },
+      },
+      select: { id: true },
+    }),
+  ]);
+
+  const hasPassword = !!credentialAccount;
 
   return (
     <div className="max-w-xl mx-auto space-y-8">
@@ -48,6 +60,12 @@ async function ProfileContent() {
           }}
         />
       </Card>
+
+      {hasPassword && (
+        <Card className="p-6 sm:p-8 bg-white border border-navy-100 shadow-sm">
+          <ChangePasswordForm />
+        </Card>
+      )}
     </div>
   );
 }
