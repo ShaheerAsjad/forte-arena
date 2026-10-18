@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
@@ -39,6 +39,45 @@ export function SiteHeader() {
   const { data: session } = useSession();
   const user = session?.user;
 
+  const profileMenuRef = useRef<HTMLDivElement>(null);
+  const profileTriggerRef = useRef<HTMLButtonElement>(null);
+
+  const [prevPathname, setPrevPathname] = useState(pathname);
+  if (prevPathname !== pathname) {
+    setPrevPathname(pathname);
+    setProfileMenuOpen(false);
+  }
+
+  // Close profile menu on outside click or Escape key
+  useEffect(() => {
+    if (!profileMenuOpen) return;
+
+    const handlePointerDown = (event: PointerEvent) => {
+      if (
+        profileMenuRef.current &&
+        event.target instanceof Node &&
+        !profileMenuRef.current.contains(event.target)
+      ) {
+        setProfileMenuOpen(false);
+      }
+    };
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setProfileMenuOpen(false);
+        profileTriggerRef.current?.focus();
+      }
+    };
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [profileMenuOpen]);
+
   useEffect(() => {
     const handleScroll = () => {
       setIsScrolled(window.scrollY > 400);
@@ -71,12 +110,15 @@ export function SiteHeader() {
         className={cn(
           "flex items-center justify-between px-5 py-3 rounded-full backdrop-blur-md transition-all duration-300",
           isDarkHero
-            ? "bg-navy-950/80 border border-white/15 shadow-xl shadow-navy-950/30 text-ivory [&_span]:text-ivory"
+            ? "bg-navy-950/80 border border-white/15 shadow-xl shadow-navy-950/30 text-ivory"
             : "bg-white/90 border border-navy-100/70 shadow-lg shadow-navy-950/5 text-navy-950"
         )}
       >
         {/* Logo */}
-        <Logo size="md" />
+        <Logo
+          size="md"
+          className={cn(isDarkHero && "[&_span]:text-ivory [&_span]:group-hover:text-white")}
+        />
 
         {/* Desktop Nav Links */}
         <nav
@@ -132,16 +174,18 @@ export function SiteHeader() {
         {/* Right Action / Profile Menu */}
         <div className="hidden sm:flex items-center gap-2.5">
           {user ? (
-            <div className="relative">
+            <div className="relative" ref={profileMenuRef}>
               <button
-                onClick={() => setProfileMenuOpen(!profileMenuOpen)}
+                ref={profileTriggerRef}
+                onClick={() => setProfileMenuOpen((prev) => !prev)}
                 aria-label="User profile menu"
+                aria-haspopup="menu"
                 aria-expanded={profileMenuOpen}
                 className={cn(
                   "flex items-center gap-2 p-1 pl-1.5 pr-2.5 rounded-full border transition-all cursor-pointer group focus:outline-none focus:ring-2 focus:ring-gold-400",
                   isDarkHero
                     ? "bg-white/10 hover:bg-white/15 border-white/20 text-ivory"
-                    : "bg-navy-50/80 hover:bg-navy-100/90 border-navy-200/60"
+                    : "bg-navy-50/80 hover:bg-navy-100/90 border-navy-200/60 text-navy-950"
                 )}
               >
                 <div className="w-8 h-8 rounded-full bg-gradient-to-br from-navy-900 to-navy-800 text-gold-400 border border-gold-400/50 flex items-center justify-center text-xs font-bold shadow-xs group-hover:border-gold-400 transition-colors overflow-hidden">
@@ -165,60 +209,63 @@ export function SiteHeader() {
 
               {/* Profile Dropdown Menu */}
               {profileMenuOpen && (
-                <>
-                  <div
-                    className="fixed inset-0 z-40"
-                    onClick={() => setProfileMenuOpen(false)}
-                  />
-                  <div className="absolute right-0 top-full mt-2 w-56 rounded-2xl bg-white border border-navy-100 shadow-xl py-2 z-50 animate-in fade-in slide-in-from-top-2 duration-150">
-                    <div className="px-4 py-2 border-b border-navy-50">
-                      <p className="text-xs font-bold text-navy-950 truncate">
-                        {user.name || "Student"}
-                      </p>
-                      <p className="text-[11px] text-mist truncate">
-                        {user.email}
-                      </p>
-                    </div>
-
-                    <Link
-                      href="/dashboard"
-                      onClick={() => setProfileMenuOpen(false)}
-                      className="flex items-center gap-2 px-4 py-2 text-xs font-medium text-navy-900 hover:bg-navy-50 transition"
-                    >
-                      <LayoutDashboard className="w-4 h-4 text-gold-600" />
-                      <span>My Registrations</span>
-                    </Link>
-
-                    <Link
-                      href="/profile"
-                      onClick={() => setProfileMenuOpen(false)}
-                      className="flex items-center gap-2 px-4 py-2 text-xs font-medium text-navy-900 hover:bg-navy-50 transition"
-                    >
-                      <UserIcon className="w-4 h-4 text-gold-600" />
-                      <span>Edit Profile</span>
-                    </Link>
-
-                    {((user as unknown as { role?: string }).role === "ORGANIZER" ||
-                      (user as unknown as { role?: string }).role === "ADMIN") && (
-                      <Link
-                        href="/admin"
-                        onClick={() => setProfileMenuOpen(false)}
-                        className="flex items-center gap-2 px-4 py-2 text-xs font-semibold text-gold-600 bg-gold-50/50 hover:bg-gold-50 transition border-y border-gold-100"
-                      >
-                        <Shield className="w-4 h-4 text-gold-600" />
-                        <span>Organizer Console</span>
-                      </Link>
-                    )}
-
-                    <button
-                      onClick={handleSignOut}
-                      className="w-full flex items-center gap-2 px-4 py-2 text-xs font-medium text-danger hover:bg-danger-bg transition text-left cursor-pointer"
-                    >
-                      <LogOut className="w-4 h-4" />
-                      <span>Sign out</span>
-                    </button>
+                <div
+                  role="menu"
+                  aria-orientation="vertical"
+                  aria-label="User profile options"
+                  className="absolute right-0 top-full mt-2 w-56 rounded-2xl bg-white border border-navy-100 shadow-xl py-2 z-50 text-[#001969]"
+                >
+                  <div className="px-4 py-2 border-b border-navy-50">
+                    <p className="text-xs font-bold text-[#001969] truncate">
+                      {user.name || "Student"}
+                    </p>
+                    <p className="text-[11px] text-mist truncate">
+                      {user.email}
+                    </p>
                   </div>
-                </>
+
+                  <Link
+                    href="/dashboard"
+                    role="menuitem"
+                    onClick={() => setProfileMenuOpen(false)}
+                    className="flex items-center gap-2 px-4 py-2 text-xs font-semibold text-[#001969] hover:bg-[#FFF3C9] hover:text-[#001969] focus-visible:bg-[#FFF3C9] focus-visible:text-[#001969] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-500 transition-colors"
+                  >
+                    <LayoutDashboard className="w-4 h-4 text-gold-600 shrink-0" />
+                    <span className="text-[#001969]">My Registrations</span>
+                  </Link>
+
+                  <Link
+                    href="/profile"
+                    role="menuitem"
+                    onClick={() => setProfileMenuOpen(false)}
+                    className="flex items-center gap-2 px-4 py-2 text-xs font-semibold text-[#001969] hover:bg-[#FFF3C9] hover:text-[#001969] focus-visible:bg-[#FFF3C9] focus-visible:text-[#001969] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-500 transition-colors"
+                  >
+                    <UserIcon className="w-4 h-4 text-gold-600 shrink-0" />
+                    <span className="text-[#001969]">Edit Profile</span>
+                  </Link>
+
+                  {((user as unknown as { role?: string }).role === "ORGANIZER" ||
+                    (user as unknown as { role?: string }).role === "ADMIN") && (
+                    <Link
+                      href="/admin"
+                      role="menuitem"
+                      onClick={() => setProfileMenuOpen(false)}
+                      className="flex items-center gap-2 px-4 py-2 text-xs font-semibold text-[#001969] hover:bg-[#FFF3C9] hover:text-[#001969] focus-visible:bg-[#FFF3C9] focus-visible:text-[#001969] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-500 transition-colors"
+                    >
+                      <Shield className="w-4 h-4 text-gold-600 shrink-0" />
+                      <span className="text-[#001969]">Organizer Console</span>
+                    </Link>
+                  )}
+
+                  <button
+                    onClick={handleSignOut}
+                    role="menuitem"
+                    className="w-full flex items-center gap-2 px-4 py-2 text-xs font-semibold text-[#B42318] hover:bg-[#FEE4E2] hover:text-[#912018] focus-visible:bg-[#FEE4E2] focus-visible:text-[#912018] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#B42318] transition-colors text-left cursor-pointer"
+                  >
+                    <LogOut className="w-4 h-4 text-[#B42318] shrink-0" />
+                    <span className="text-[#B42318]">Sign out</span>
+                  </button>
+                </div>
               )}
             </div>
           ) : (
