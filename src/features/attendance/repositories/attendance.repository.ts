@@ -1,5 +1,4 @@
 import { prisma } from "@/lib/prisma";
-import { isEventAttendanceAllowed } from "../attendance.config";
 import { getEffectiveStatus } from "@/features/events/events.derived";
 import type { EventStatus } from "@/lib/db-types";
 
@@ -520,10 +519,10 @@ export class AttendanceRepository {
   }
 
   /**
-   * Get all events currently scannable by organizers.
-   * Restricted to ATTENDANCE_ALLOWED_EVENT_STATUSES with approved registrations.
+   * Get all events with at least one approved registration for the organizer scan console,
+   * regardless of lifecycle status (status gating is enforced at check-in time).
    */
-  static async getScannableEvents() {
+  static async getEventsWithApprovedRegistrations() {
     const rawEvents = await prisma.event.findMany({
       where: {
         registrations: { some: { status: "APPROVED" } },
@@ -542,12 +541,8 @@ export class AttendanceRepository {
       },
     });
 
-    const activeEvents = rawEvents.filter((ev) =>
-      isEventAttendanceAllowed(getEffectiveStatus(ev))
-    );
-
     const eventsWithCounts = await Promise.all(
-      activeEvents.map(async (ev) => {
+      rawEvents.map(async (ev) => {
         const [soloCount, teamMemberCount] = await Promise.all([
           prisma.registration.count({
             where: { eventId: ev.id, status: "APPROVED", teamId: null },
@@ -576,5 +571,12 @@ export class AttendanceRepository {
     );
 
     return eventsWithCounts;
+  }
+
+  /**
+   * Alias for getEventsWithApprovedRegistrations.
+   */
+  static async getScannableEvents() {
+    return this.getEventsWithApprovedRegistrations();
   }
 }

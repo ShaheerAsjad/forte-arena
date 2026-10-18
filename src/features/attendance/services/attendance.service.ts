@@ -115,7 +115,7 @@ export function evaluateCheckInEligibility({
     return {
       success: false,
       code: "EVENT_NOT_OPEN",
-      message: `Check-in is not open for this event (event status: ${effectiveStatus.toLowerCase()}).`,
+      message: `This event is ${effectiveStatus.toLowerCase()} — attendance can no longer be recorded for it.`,
     };
   }
 
@@ -351,7 +351,7 @@ export class AttendanceService {
         return {
           success: false,
           code: "EVENT_NOT_OPEN",
-          message: `Check-in is not open for this event (status: ${effectiveStatus.toLowerCase()}).`,
+          message: `This event is ${effectiveStatus.toLowerCase()} — attendance can no longer be recorded for it.`,
         };
       }
 
@@ -463,7 +463,7 @@ export class AttendanceService {
       return {
         success: false,
         code: "EVENT_NOT_OPEN",
-        message: `Check-in is not open for this event (status: ${effectiveStatus.toLowerCase()}).`,
+        message: `This event is ${effectiveStatus.toLowerCase()} — attendance can no longer be recorded for it.`,
       };
     }
 
@@ -550,7 +550,11 @@ export class AttendanceService {
 
       const effectiveStatus = computeEffectiveEventStatus(event);
       if (!isEventAttendanceAllowed(effectiveStatus)) {
-        return { success: false, code: "EVENT_NOT_OPEN", message: `Event is ${effectiveStatus.toLowerCase()}` };
+        return {
+          success: false,
+          code: "EVENT_NOT_OPEN",
+          message: `This event is ${effectiveStatus.toLowerCase()} — attendance can no longer be recorded for it.`,
+        };
       }
 
       if (team.registrations.length === 0) {
@@ -632,7 +636,7 @@ export class AttendanceService {
       return {
         success: false,
         code: "EVENT_NOT_OPEN",
-        message: `Check-in is not open for this event (status: ${effectiveStatus.toLowerCase()})`,
+        message: `This event is ${effectiveStatus.toLowerCase()} — attendance can no longer be recorded for it.`,
       };
     }
 
@@ -712,7 +716,15 @@ export class AttendanceService {
   }
 
   /**
-   * Get all events scannable by organizers.
+   * Get all events with approved registrations for the organizer scan console,
+   * regardless of lifecycle status (status gating is enforced at check-in time).
+   */
+  static async getEventsWithApprovedRegistrations() {
+    return AttendanceRepository.getEventsWithApprovedRegistrations();
+  }
+
+  /**
+   * Alias for getEventsWithApprovedRegistrations.
    */
   static async getScannableEvents() {
     return AttendanceRepository.getScannableEvents();

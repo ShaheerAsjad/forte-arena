@@ -14,7 +14,7 @@ export default async function AdminScanPage({
 }) {
   await requireRole(["ORGANIZER", "ADMIN"], "/login?next=/admin/scan");
 
-  const rawEvents = await AttendanceService.getScannableEvents();
+  const rawEvents = await AttendanceService.getEventsWithApprovedRegistrations();
   const { eventId } = await searchParams;
 
   const events = rawEvents.map((e) => ({
@@ -23,6 +23,7 @@ export default async function AdminScanPage({
     title: e.title,
     venue: e.venue,
     startsAt: e.startsAt,
+    status: e.status,
     approvedCount: e.approvedPeopleCount,
   }));
 

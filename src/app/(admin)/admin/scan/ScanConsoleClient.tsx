@@ -36,6 +36,7 @@ export interface ScannableEventOption {
   title: string;
   venue: string;
   startsAt: Date | string;
+  status: string;
   approvedCount: number;
 }
 
@@ -188,7 +189,12 @@ export function ScanConsoleClient({
         triggerVibration("error");
         setScanResult({
           type: "error",
-          title: data.code === "INVALID_FORMAT" ? "Invalid Pass Format" : "Scan Rejected",
+          title:
+            data.code === "INVALID_FORMAT"
+              ? "Invalid Pass Format"
+              : data.code === "EVENT_NOT_OPEN"
+              ? "Event Closed"
+              : "Scan Rejected",
           message: data.message,
           scannedLength: data.scannedLength,
         });
@@ -353,18 +359,18 @@ export function ScanConsoleClient({
       ? Math.round((stats.totalAttended / stats.totalApproved) * 100)
       : 0;
 
-  // If no events are scannable (none published/closed with approved registrations)
+  // If no events have approved registrations
   if (events.length === 0) {
     return (
       <div className="max-w-2xl mx-auto py-12 px-4 text-center space-y-4 font-sans">
-        <div className="w-14 h-14 rounded-3xl bg-amber-50 text-amber-600 flex items-center justify-center mx-auto border border-amber-200">
-          <AlertCircle className="w-7 h-7" />
+        <div className="w-14 h-14 rounded-3xl bg-navy-50 text-mist flex items-center justify-center mx-auto border border-navy-100">
+          <AlertCircle className="w-7 h-7 text-mist" />
         </div>
         <h2 className="text-xl sm:text-2xl font-black font-heading text-navy-950">
-          No Active Events for Attendance
+          No Approved Registrations
         </h2>
         <p className="text-sm text-mist max-w-md mx-auto leading-relaxed">
-          Attendance check-in is only available for active published or ongoing events that have approved registrations.
+          There are no events with approved participant registrations yet. Once applications are approved in the Registrations Hub, they will appear here for check-in.
         </p>
       </div>
     );
@@ -396,16 +402,44 @@ export function ScanConsoleClient({
 
           {/* Event Picker Dropdown */}
           <div className="w-full md:w-80">
-            <label className="block text-[11px] sm:text-xs font-bold uppercase tracking-wider text-mist mb-1">
-              Select Active Event
-            </label>
+            <div className="flex items-center justify-between gap-2 mb-1">
+              <label className="block text-[11px] sm:text-xs font-bold uppercase tracking-wider text-mist">
+                Select Active Event
+              </label>
+              {currentEvent && (
+                <span className="text-[10px] font-semibold text-navy-700 bg-navy-100/90 px-2 py-0.5 rounded-full border border-navy-200 shrink-0">
+                  {currentEvent.status === "PUBLISHED"
+                    ? "Published"
+                    : currentEvent.status === "CLOSED"
+                    ? "Closed"
+                    : currentEvent.status === "COMPLETED"
+                    ? "Completed"
+                    : currentEvent.status === "CANCELLED"
+                    ? "Cancelled"
+                    : "Draft"}
+                </span>
+              )}
+            </div>
             <Select
               value={selectedEventId}
               onChange={(val) => handleEventChange(val)}
-              options={events.map((e) => ({
-                value: e.id,
-                label: `${e.title} (${e.approvedCount} ${e.approvedCount === 1 ? "person" : "people"})`,
-              }))}
+              options={events.map((e) => {
+                const statusName =
+                  e.status === "PUBLISHED"
+                    ? "Published"
+                    : e.status === "CLOSED"
+                    ? "Closed"
+                    : e.status === "COMPLETED"
+                    ? "Completed"
+                    : e.status === "CANCELLED"
+                    ? "Cancelled"
+                    : "Draft";
+                return {
+                  value: e.id,
+                  label: `${e.title} (${e.approvedCount} ${e.approvedCount === 1 ? "person" : "people"})`,
+                  description: `Status: ${statusName}`,
+                };
+              })}
             />
           </div>
         </div>
@@ -414,6 +448,18 @@ export function ScanConsoleClient({
         {currentEvent && (
           <div className="pt-3 sm:pt-4 border-t border-navy-50 flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
             <div className="flex flex-wrap items-center gap-2 sm:gap-3 text-xs text-mist">
+              <span className="text-[10px] font-semibold text-navy-700 bg-navy-100/80 px-2 py-0.5 rounded-full border border-navy-200">
+                {currentEvent.status === "PUBLISHED"
+                  ? "Published"
+                  : currentEvent.status === "CLOSED"
+                  ? "Closed"
+                  : currentEvent.status === "COMPLETED"
+                  ? "Completed"
+                  : currentEvent.status === "CANCELLED"
+                  ? "Cancelled"
+                  : "Draft"}
+              </span>
+              <span>•</span>
               <span className="flex items-center gap-1 font-medium text-navy-900">
                 <Calendar className="w-3.5 h-3.5 text-gold-600" />
                 {formatEventDate(currentEvent.startsAt)}
