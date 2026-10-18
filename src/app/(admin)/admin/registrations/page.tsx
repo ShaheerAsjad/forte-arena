@@ -65,6 +65,7 @@ async function CrossEventRegistrationsContent() {
                 rollNumber: true,
                 email: true,
                 phone: true,
+                attendedAt: true,
               },
             },
           },

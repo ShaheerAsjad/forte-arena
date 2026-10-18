@@ -72,6 +72,7 @@ async function RegistrationsContent({
               rollNumber: true,
               email: true,
               phone: true,
+              attendedAt: true,
             },
           },
         },

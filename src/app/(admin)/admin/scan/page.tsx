@@ -23,7 +23,7 @@ export default async function AdminScanPage({
     title: e.title,
     venue: e.venue,
     startsAt: e.startsAt,
-    approvedCount: e._count.registrations,
+    approvedCount: e.approvedPeopleCount,
   }));
 
   const activeEventId = eventId || events[0]?.id || "";

@@ -6,8 +6,10 @@ import { AppError } from "@/lib/errors";
 import type { ActionResult } from "@/lib/action-result";
 import {
   scanCheckInSchema,
+  manualCheckInSchema,
   undoCheckInSchema,
   type ScanCheckInInput,
+  type ManualCheckInInput,
   type UndoCheckInInput,
 } from "./attendance.schemas";
 import {
@@ -17,8 +19,6 @@ import {
 
 /**
  * Server action to process in-browser QR scan check-in.
- * Enforces ORGANIZER / ADMIN authorization, validates input with Zod,
- * verifies event and status, and performs idempotent check-in.
  */
 export async function scanCheckInAction(
   rawInput: ScanCheckInInput
@@ -61,29 +61,35 @@ export async function scanCheckInAction(
 }
 
 /**
- * Server action to process manual check-in by registration ID.
+ * Server action to process manual check-in for solo attendee or team member.
  */
-export async function manualCheckInAction(input: {
-  registrationId: string;
-  eventId: string;
-}): Promise<ActionResult<CheckInResult>> {
+export async function manualCheckInAction(
+  rawInput: ManualCheckInInput
+): Promise<ActionResult<CheckInResult>> {
   try {
     const user = await requireRole(["ORGANIZER", "ADMIN"]);
 
-    if (!input.registrationId || !input.eventId) {
-      return { ok: false, error: "Registration ID and Event ID are required" };
+    const parsed = manualCheckInSchema.safeParse(rawInput);
+    if (!parsed.success) {
+      return {
+        ok: false,
+        error: parsed.error.issues[0]?.message || "Invalid manual check-in data",
+      };
     }
 
-    const result = await AttendanceService.checkInByRegistrationId({
-      registrationId: input.registrationId,
-      eventId: input.eventId,
+    const { participantId, participantType, eventId } = parsed.data;
+
+    const result = await AttendanceService.checkInManually({
+      participantId,
+      participantType,
+      eventId,
       organizerId: user.id,
     });
 
     if (result.success && !result.alreadyCheckedIn) {
       revalidatePath("/admin/scan");
       revalidatePath("/admin/registrations");
-      revalidatePath(`/admin/events/${input.eventId}/registrations`);
+      revalidatePath(`/admin/events/${eventId}/registrations`);
     }
 
     return { ok: true, data: result };
@@ -99,7 +105,7 @@ export async function manualCheckInAction(input: {
 }
 
 /**
- * Server action to search approved registrations for manual entry fallback.
+ * Server action to search approved participants for manual entry fallback.
  */
 export async function searchManualRegistrationsAction(
   eventId: string,
@@ -126,7 +132,7 @@ export async function searchManualRegistrationsAction(
 }
 
 /**
- * Server action to undo an accidental check-in.
+ * Server action to undo an accidental check-in (supports both solo attendee and team member).
  */
 export async function undoCheckInAction(
   rawInput: UndoCheckInInput
@@ -138,11 +144,11 @@ export async function undoCheckInAction(
     if (!parsed.success) {
       return {
         ok: false,
-        error: parsed.error.issues[0]?.message || "Invalid registration ID",
+        error: parsed.error.issues[0]?.message || "Invalid participant ID",
       };
     }
 
-    const updated = await AttendanceService.undoCheckIn(parsed.data.registrationId);
+    const updated = await AttendanceService.undoCheckIn(parsed.data);
 
     revalidatePath("/admin/scan");
     revalidatePath("/admin/registrations");
@@ -161,7 +167,7 @@ export async function undoCheckInAction(
 }
 
 /**
- * Server action to get live stats and recent check-ins for an event.
+ * Server action to get live stats and recent check-ins for an event (counting people).
  */
 export async function getEventAttendanceStatsAction(
   eventId: string

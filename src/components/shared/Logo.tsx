@@ -44,7 +44,7 @@ export function Logo({
       {showText && (
         <span
           className={cn(
-            "font-extrabold tracking-tight font-heading text-navy-950 group-hover:text-navy-700 transition-colors",
+            "font-extrabold tracking-tight font-heading text-navy-950 group-hover:text-navy-700 transition-colors whitespace-nowrap",
             sizeMap[size].text
           )}
         >

@@ -2,6 +2,7 @@ import { type NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { buildCsv } from "@/features/admin/admin.utils";
+import { formatTime24 } from "@/lib/dates";
 
 export async function GET(
   request: NextRequest,
@@ -51,6 +52,7 @@ export async function GET(
                 rollNumber: true,
                 email: true,
                 phone: true,
+                attendedAt: true,
               },
             },
           },
@@ -92,8 +94,19 @@ export async function GET(
         : "";
 
       const submittedAt = new Date(reg.createdAt).toISOString();
-      const attended = reg.attendedAt ? "Yes" : "No";
-      const attendedAtStr = reg.attendedAt ? new Date(reg.attendedAt).toISOString() : "";
+      let attended = "No";
+      let attendedAtStr = "";
+      if (isTeam && reg.team) {
+        const total = reg.team.members.length;
+        const attendedMembers = reg.team.members.filter((m) => m.attendedAt !== null);
+        attended = `${attendedMembers.length}/${total}`;
+        attendedAtStr = attendedMembers
+          .map((m) => `${m.fullName}: ${formatTime24(m.attendedAt!)}`)
+          .join("; ");
+      } else {
+        attended = reg.attendedAt ? "Yes" : "No";
+        attendedAtStr = reg.attendedAt ? formatTime24(reg.attendedAt) : "";
+      }
       const notes = reg.notes || reg.rejectionReason || "";
 
       return [

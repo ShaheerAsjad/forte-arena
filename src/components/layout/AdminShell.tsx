@@ -131,44 +131,41 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
     <div className="min-h-screen bg-ivory text-ink flex flex-col font-sans">
       {/* 1. Slim Top Bar */}
       <header className="sticky top-0 z-40 w-full h-14 sm:h-16 bg-white/95 backdrop-blur-md border-b border-navy-100 shadow-2xs">
-        <div className="h-full px-4 sm:px-6 flex items-center justify-between gap-4">
+        <div className="h-full px-3 sm:px-6 flex items-center justify-between gap-2 sm:gap-4">
           {/* Left: Mobile hamburger + Logo + Organizer Badge */}
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
             <button
               type="button"
               onClick={() => setIsDrawerOpen(true)}
-              className="p-1.5 -ml-1.5 rounded-xl text-mist hover:text-navy-950 hover:bg-navy-50 md:hidden transition cursor-pointer"
+              className="p-1.5 -ml-1 sm:-ml-1.5 rounded-xl text-mist hover:text-navy-950 hover:bg-navy-50 md:hidden transition cursor-pointer shrink-0"
               aria-label="Open navigation drawer"
             >
               <Menu className="w-5 h-5" />
             </button>
 
-            <Logo size="sm" href="/" />
+            <Logo size="sm" href="/" className="shrink-0" />
 
-            <div className="hidden sm:flex items-center gap-1.5 ml-1">
-              <span className="text-[10px] font-extrabold uppercase tracking-widest text-navy-950 bg-navy-100/90 border border-navy-200/80 px-2.5 py-0.5 rounded-full">
+            <div className="hidden sm:flex items-center gap-1.5 ml-1 shrink-0">
+              <span className="text-[10px] font-extrabold uppercase tracking-widest text-navy-950 bg-navy-100/90 border border-navy-200/80 px-2.5 py-0.5 rounded-full whitespace-nowrap">
                 ORGANIZER CONSOLE
               </span>
             </div>
           </div>
 
           {/* Right: Public Site Link + Sign Out */}
-          <div className="flex items-center gap-2 sm:gap-4">
-            <span className="sm:hidden text-[9px] font-extrabold uppercase tracking-wider text-navy-900 bg-navy-100 px-2 py-0.5 rounded-full">
-              ORGANIZER
-            </span>
-
+          <div className="flex items-center gap-1.5 sm:gap-4 shrink-0">
             <Link
               href="/"
-              className="inline-flex items-center gap-1.5 text-xs font-semibold text-navy-700 hover:text-navy-950 px-2.5 py-1.5 rounded-xl hover:bg-navy-50 transition"
+              aria-label="Back to Home"
+              className="inline-flex items-center justify-center p-2 sm:px-2.5 sm:py-1.5 text-xs font-semibold text-navy-700 hover:text-navy-950 rounded-xl hover:bg-navy-50 transition shrink-0"
             >
-              <Home className="w-3.5 h-3.5 text-gold-600" />
-              <span>Back to Home</span>
+              <Home className="w-4 h-4 sm:w-3.5 sm:h-3.5 text-gold-600 shrink-0" />
+              <span className="hidden sm:inline ml-1.5">Back to Home</span>
             </Link>
 
             <div className="h-4 w-px bg-navy-200/60 hidden sm:block" />
 
-            <SignOutButton />
+            <SignOutButton className="px-2.5 py-1.5 sm:px-4 sm:py-2 text-xs sm:text-sm whitespace-nowrap shrink-0" />
           </div>
         </div>
       </header>
@@ -273,17 +270,17 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
               >
                 <div className="space-y-6">
                   {/* Drawer Header */}
-                  <div className="flex items-center justify-between pb-3 border-b border-navy-100">
-                    <div className="flex items-center gap-2">
-                      <Logo size="sm" href="/" />
-                      <span className="text-[10px] font-extrabold uppercase tracking-wider text-navy-950 bg-navy-100 px-2 py-0.5 rounded-full">
+                  <div className="flex items-center justify-between pb-3 border-b border-navy-100 gap-2">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <Logo size="sm" href="/" className="shrink-0" />
+                      <span className="text-[10px] font-extrabold uppercase tracking-wider text-navy-950 bg-navy-100 px-2 py-0.5 rounded-full shrink-0">
                         ORGANIZER
                       </span>
                     </div>
                     <button
                       type="button"
                       onClick={() => setIsDrawerOpen(false)}
-                      className="p-1.5 rounded-xl text-mist hover:text-navy-950 hover:bg-navy-50 transition cursor-pointer"
+                      className="p-1.5 rounded-xl text-mist hover:text-navy-950 hover:bg-navy-50 transition cursor-pointer shrink-0"
                       aria-label="Close navigation drawer"
                     >
                       <X className="w-5 h-5" />

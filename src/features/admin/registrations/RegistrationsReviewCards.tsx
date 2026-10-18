@@ -11,6 +11,7 @@ import { formatTime24 } from "@/lib/dates";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Select } from "@/components/ui/Select";
+import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import {
   CheckCircle2,
@@ -67,6 +68,7 @@ export interface RegistrationReviewItem {
       rollNumber: string;
       email?: string | null;
       phone?: string | null;
+      attendedAt?: Date | string | null;
     }>;
   } | null;
 }
@@ -237,7 +239,12 @@ export function RegistrationsReviewCards({
       ALL: eventFiltered.length,
       PENDING: eventFiltered.filter((r) => r.status === "PENDING").length,
       APPROVED: eventFiltered.filter((r) => r.status === "APPROVED").length,
-      ATTENDED: eventFiltered.filter((r) => Boolean(r.attendedAt)).length,
+      ATTENDED: eventFiltered.filter((r) => {
+        if (r.team?.members && r.team.members.length > 0) {
+          return r.team.members.some((m) => Boolean(m.attendedAt));
+        }
+        return Boolean(r.attendedAt);
+      }).length,
       REJECTED: eventFiltered.filter((r) => r.status === "REJECTED").length,
       WITHDRAWN: eventFiltered.filter((r) => r.status === "WITHDRAWN").length,
     };
@@ -273,7 +280,11 @@ export function RegistrationsReviewCards({
     return eventFiltered.filter((reg) => {
       // 1. Status Filter
       if (statusFilter === "ATTENDED") {
-        if (!reg.attendedAt) return false;
+        if (reg.team?.members && reg.team.members.length > 0) {
+          if (!reg.team.members.some((m) => Boolean(m.attendedAt))) return false;
+        } else if (!reg.attendedAt) {
+          return false;
+        }
       } else if (statusFilter !== "ALL" && reg.status !== statusFilter) {
         return false;
       }
@@ -496,6 +507,9 @@ export function RegistrationsReviewCards({
             const isOperating = isPending && activeRegId === reg.id;
 
             const members = reg.team?.members || [];
+            const attendedMembersCount = isTeam
+              ? members.filter((m) => Boolean(m.attendedAt)).length
+              : reg.attendedAt ? 1 : 0;
             const isRosterExpanded = Boolean(expandedCards[reg.id]);
             const visibleMembers = isRosterExpanded
               ? members
@@ -591,11 +605,26 @@ export function RegistrationsReviewCards({
                   <div className="flex flex-wrap sm:flex-col items-start sm:items-end gap-2 shrink-0 self-start">
                     {/* Status Pill & Attended Badge */}
                     <div className="flex items-center gap-1.5 flex-wrap justify-end">
-                      {reg.attendedAt && (
+                      {!isTeam && reg.attendedAt && (
                         <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-800 border border-emerald-300 shadow-2xs">
                           <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
                           <span>
                             Attended · {formatTime24(reg.attendedAt)}
+                          </span>
+                        </span>
+                      )}
+                      {isTeam && members.length > 0 && attendedMembersCount > 0 && (
+                        <span
+                          className={cn(
+                            "inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold border shadow-2xs",
+                            attendedMembersCount === members.length
+                              ? "bg-emerald-50 text-emerald-800 border-emerald-300"
+                              : "bg-amber-50 text-amber-900 border-amber-300"
+                          )}
+                        >
+                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                          <span>
+                            {attendedMembersCount}/{members.length} Attended
                           </span>
                         </span>
                       )}
@@ -698,12 +727,22 @@ export function RegistrationsReviewCards({
                       {visibleMembers.map((m) => (
                         <div
                           key={m.id}
-                          className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-white border border-navy-200 text-xs text-navy-950 shadow-2xs"
+                          className={cn(
+                            "inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-white border text-xs shadow-2xs",
+                            m.attendedAt
+                              ? "border-emerald-300 bg-emerald-50/60 text-emerald-950 font-semibold"
+                              : "border-navy-200 text-navy-950"
+                          )}
                         >
                           <span className="font-semibold">{m.fullName}</span>
                           <span className="font-mono text-[11px] font-bold text-mist">
                             [{m.rollNumber}]
                           </span>
+                          {m.attendedAt && (
+                            <span className="text-[10px] font-extrabold text-emerald-700 bg-emerald-100/90 px-1.5 py-0.2 rounded-md">
+                              Attended
+                            </span>
+                          )}
                         </div>
                       ))}
 

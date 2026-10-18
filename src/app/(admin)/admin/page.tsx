@@ -76,7 +76,7 @@ async function AdminOverviewContent() {
           </p>
         </div>
 
-        <div className="flex items-center gap-2.5 shrink-0">
+        <div className="flex flex-wrap items-center gap-2.5 shrink-0">
           <Link href="/admin/events/new">
             <Button variant="gold" size="md" className="shadow-md shadow-gold-500/20 font-semibold">
               <Plus className="w-4 h-4 mr-1.5" />
