@@ -1241,3 +1241,44 @@ describe("Attendance Unit Tests: CSV Rows & Export Generation", () => {
   });
 });
 
+describe("Attendance Counts Query (getEventAttendanceCounts)", () => {
+  it("computes totalApproved and totalAttended matching the existing live counter definition", async () => {
+    const mockPrisma = prisma as unknown as {
+      registration: { count: ReturnType<typeof vi.fn> };
+      teamMember: { count: ReturnType<typeof vi.fn> };
+    };
+
+    mockPrisma.registration.count = vi.fn().mockImplementation((args) => {
+      // solo approved
+      if (args.where?.status === "APPROVED" && args.where?.attendedAt === undefined) {
+        return Promise.resolve(15);
+      }
+      // solo attended
+      if (args.where?.status === "APPROVED" && args.where?.attendedAt?.not !== undefined) {
+        return Promise.resolve(8);
+      }
+      return Promise.resolve(0);
+    });
+
+    mockPrisma.teamMember.count = vi.fn().mockImplementation((args) => {
+      // team members in approved teams
+      if (args.where?.attendedAt === undefined) {
+        return Promise.resolve(20);
+      }
+      // team members attended
+      if (args.where?.attendedAt?.not !== undefined) {
+        return Promise.resolve(12);
+      }
+      return Promise.resolve(0);
+    });
+
+    const counts = await AttendanceService.getEventAttendanceCounts("event-123");
+
+    // totalApproved = soloApproved (15) + teamApprovedMembers (20) = 35
+    expect(counts.totalApproved).toBe(35);
+    // totalAttended = soloAttended (8) + teamAttendedMembers (12) = 20
+    expect(counts.totalAttended).toBe(20);
+  });
+});
+
+

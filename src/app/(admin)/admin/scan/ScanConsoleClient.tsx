@@ -7,10 +7,15 @@ import { Card } from "@/components/ui/Card";
 import { Select } from "@/components/ui/Select";
 import {
   scanCheckInAction,
-  getEventAttendanceStatsAction,
+  getEventAttendanceCountsAction,
 } from "@/features/attendance/attendance.actions";
 import { formatEventDate, formatTime24 } from "@/lib/dates";
 import { getEventNotOpenCardTitle } from "@/features/attendance/attendance.config";
+import {
+  useSelectedEventId,
+  setStoredSelectedEventId,
+  resolveSelectedEventId,
+} from "@/features/attendance/attendance.selection";
 import {
   CheckCircle2,
   XCircle,
@@ -45,35 +50,45 @@ interface ScanResultCardState {
   scannedLength?: number;
 }
 
-export interface AttendanceStatsState {
+export interface AttendanceCountsState {
   totalApproved: number;
   totalAttended: number;
-  recentCheckIns: Array<{
-    id: string;
-    participantType: "SOLO" | "TEAM_MEMBER";
-    name: string;
-    rollNumber: string | null;
-    department?: string | null;
-    teamName: string | null;
-    attendedAt: Date | string | null;
-    attendedBy?: { name: string } | null;
-  }>;
 }
+
+// Backwards-compatible alias
+export type AttendanceStatsState = AttendanceCountsState;
 
 export function ScanConsoleClient({
   events,
   initialEventId,
+  initialCounts,
   initialStats,
 }: {
   events: ScannableEventOption[];
   initialEventId?: string;
-  initialStats: AttendanceStatsState;
+  initialCounts?: AttendanceCountsState;
+  initialStats?: AttendanceCountsState;
 }) {
-  const [selectedEventId, setSelectedEventId] = useState<string>(
-    initialEventId || events[0]?.id || ""
-  );
+  const storedEventId = useSelectedEventId();
+  const [localEventId, setLocalEventId] = useState<string | null>(null);
 
-  const [stats, setStats] = useState<AttendanceStatsState>(initialStats);
+  // URL param takes top precedence, then local user interaction, then stored sessionStorage, then default
+  const urlEventId =
+    typeof window !== "undefined"
+      ? new URLSearchParams(window.location.search).get("eventId")
+      : null;
+
+  const validIds = events.map((e) => e.id);
+  const selectedEventId = resolveSelectedEventId({
+    urlEventId,
+    storedEventId: localEventId || storedEventId,
+    validEventIds: validIds,
+    defaultEventId: initialEventId || events[0]?.id,
+  });
+
+  const [counts, setCounts] = useState<AttendanceCountsState>(
+    initialCounts || initialStats || { totalApproved: 0, totalAttended: 0 }
+  );
 
   // Scan cooldown and state
   const [isCooldown, setIsCooldown] = useState(false);
@@ -84,23 +99,56 @@ export function ScanConsoleClient({
 
   const currentEvent = events.find((e) => e.id === selectedEventId);
 
-  // Refresh attendance stats for currently active event
-  const refreshStats = useCallback(async (eventId: string) => {
+  // Refresh attendance counts for currently active event
+  const refreshCounts = useCallback(async (eventId: string) => {
     if (!eventId) return;
     try {
-      const res = await getEventAttendanceStatsAction(eventId);
+      const res = await getEventAttendanceCountsAction(eventId);
       if (res.ok) {
-        setStats(res.data);
+        setCounts(res.data);
       }
     } catch {
       // Background fetch failure ignored
     }
   }, []);
 
+  // Sync stored event ID and fetch live counts in background whenever active event changes
+  useEffect(() => {
+    if (!selectedEventId) return;
+    setStoredSelectedEventId(selectedEventId);
+
+    let isMounted = true;
+    getEventAttendanceCountsAction(selectedEventId)
+      .then((res) => {
+        if (isMounted && res.ok) {
+          setCounts(res.data);
+        }
+      })
+      .catch(() => {});
+
+    return () => {
+      isMounted = false;
+    };
+  }, [selectedEventId]);
+
   const handleEventChange = (newEventId: string) => {
-    setSelectedEventId(newEventId);
+    if (!newEventId || newEventId === selectedEventId) return;
+
+    setLocalEventId(newEventId);
+    setStoredSelectedEventId(newEventId);
     setScanResult(null);
-    refreshStats(newEventId);
+
+    const matched = events.find((e) => e.id === newEventId);
+    setCounts({
+      totalApproved: matched ? matched.approvedCount : 0,
+      totalAttended: 0,
+    });
+
+    if (typeof window !== "undefined") {
+      const url = new URL(window.location.href);
+      url.searchParams.set("eventId", newEventId);
+      window.history.replaceState(null, "", url.toString());
+    }
   };
 
   // Clean cooldown timer on unmount
@@ -196,8 +244,8 @@ export function ScanConsoleClient({
           teamProgress: data.registration?.teamProgress,
           attendedAt: data.attendedAt,
         });
-        // Auto refresh stats
-        refreshStats(selectedEventId);
+        // Auto refresh counts
+        refreshCounts(selectedEventId);
       }
     } catch {
       triggerVibration("error");
@@ -210,8 +258,8 @@ export function ScanConsoleClient({
   };
 
   const percentage =
-    stats.totalApproved > 0
-      ? Math.round((stats.totalAttended / stats.totalApproved) * 100)
+    counts.totalApproved > 0
+      ? Math.round((counts.totalAttended / counts.totalApproved) * 100)
       : 0;
 
   if (events.length === 0) {
@@ -329,9 +377,9 @@ export function ScanConsoleClient({
                   Attendance Progress
                 </p>
                 <p className="text-sm font-extrabold text-navy-950">
-                  <span className="text-emerald-600">{stats.totalAttended}</span>
+                  <span className="text-emerald-600">{counts.totalAttended}</span>
                   <span className="text-mist font-normal"> of </span>
-                  <span>{stats.totalApproved}</span>{" "}
+                  <span>{counts.totalApproved}</span>{" "}
                   <span className="text-xs text-mist font-medium">people present</span>
                 </p>
               </div>

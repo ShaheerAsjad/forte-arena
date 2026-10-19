@@ -170,11 +170,11 @@ export async function undoCheckInAction(
 }
 
 /**
- * Server action to get live stats and recent check-ins for an event (counting people).
+ * Server action to get lightweight attendance counts (totalApproved and totalAttended) for the scan gate.
  */
-export async function getEventAttendanceStatsAction(
+export async function getEventAttendanceCountsAction(
   eventId: string
-): Promise<ActionResult<Awaited<ReturnType<typeof AttendanceService.getEventStats>>>> {
+): Promise<ActionResult<Awaited<ReturnType<typeof AttendanceService.getEventAttendanceCounts>>>> {
   try {
     await requireRole(["ORGANIZER", "ADMIN"]);
 
@@ -182,15 +182,15 @@ export async function getEventAttendanceStatsAction(
       return { ok: false, error: "Event ID is required" };
     }
 
-    const stats = await AttendanceService.getEventStats(eventId);
-    return { ok: true, data: stats };
+    const counts = await AttendanceService.getEventAttendanceCounts(eventId);
+    return { ok: true, data: counts };
   } catch (err) {
     const message =
       err instanceof AppError
         ? err.message
         : err instanceof Error
         ? err.message
-        : "Failed to fetch event attendance stats";
+        : "Failed to fetch event attendance counts";
     return { ok: false, error: message };
   }
 }

@@ -27,17 +27,23 @@ export default async function AdminScanPage({
     approvedCount: e.approvedPeopleCount,
   }));
 
-  const activeEventId = eventId || events[0]?.id || "";
-  const initialStats = activeEventId
-    ? await AttendanceService.getEventStats(activeEventId)
-    : { totalApproved: 0, totalAttended: 0, recentCheckIns: [] };
+  const isValidUrlEvent = eventId ? events.some((e) => e.id === eventId) : false;
+  const activeEventId = isValidUrlEvent ? eventId! : events[0]?.id || "";
+  const selectedEvent = events.find((e) => e.id === activeEventId) || events[0];
+
+  // Defer exact live check-in stats to client background fetch (getEventAttendanceCountsAction).
+  // Immediately render with approvedCount from event list so the camera gate mounts with zero DB lag.
+  const initialCounts = {
+    totalApproved: selectedEvent?.approvedCount || 0,
+    totalAttended: 0,
+  };
 
   return (
     <div className="w-full">
       <ScanConsoleClient
         events={events}
         initialEventId={activeEventId}
-        initialStats={initialStats}
+        initialCounts={initialCounts}
       />
     </div>
   );

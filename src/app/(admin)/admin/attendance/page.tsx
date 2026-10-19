@@ -26,7 +26,8 @@ export default async function AdminAttendancePage({
     status: e.status,
   }));
 
-  const activeEventId = eventId || events[0]?.id || "";
+  const isValidUrlEvent = eventId ? events.some((e) => e.id === eventId) : false;
+  const activeEventId = isValidUrlEvent ? eventId! : events[0]?.id || "";
 
   const [initialStats, initialParticipants] = await Promise.all([
     activeEventId

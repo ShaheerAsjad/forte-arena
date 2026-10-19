@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition, useCallback } from "react";
+import { useState, useEffect, useRef, useTransition, useCallback } from "react";
 import Link from "next/link";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
@@ -14,6 +14,11 @@ import {
 } from "@/features/attendance/attendance.actions";
 import { isEventAttendanceAllowed } from "@/features/attendance/attendance.config";
 import { formatEventDate, formatTime24 } from "@/lib/dates";
+import {
+  useSelectedEventId,
+  setStoredSelectedEventId,
+  resolveSelectedEventId,
+} from "@/features/attendance/attendance.selection";
 import type {
   EventDetailedStats,
   AttendanceParticipantItem,
@@ -55,14 +60,27 @@ export function AttendanceConsoleClient({
   initialStats: EventDetailedStats;
   initialParticipants: AttendanceParticipantItem[];
 }) {
-  const [selectedEventId, setSelectedEventId] = useState<string>(
-    initialEventId || events[0]?.id || ""
-  );
+  const storedEventId = useSelectedEventId();
+  const [localEventId, setLocalEventId] = useState<string | null>(null);
+
+  const urlEventId =
+    typeof window !== "undefined"
+      ? new URLSearchParams(window.location.search).get("eventId")
+      : null;
+
+  const validIds = events.map((e) => e.id);
+  const selectedEventId = resolveSelectedEventId({
+    urlEventId,
+    storedEventId: localEventId || storedEventId,
+    validEventIds: validIds,
+    defaultEventId: initialEventId || events[0]?.id,
+  });
 
   const [stats, setStats] = useState<EventDetailedStats>(initialStats);
   const [participants, setParticipants] =
     useState<AttendanceParticipantItem[]>(initialParticipants);
   const [isLoading, setIsLoading] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   // Filter & Search states
   const [searchQuery, setSearchQuery] = useState("");
@@ -87,30 +105,65 @@ export function AttendanceConsoleClient({
   const refreshEventData = useCallback(async (eventId: string) => {
     if (!eventId) return;
     setIsLoading(true);
+    setLoadError(null);
+    setParticipants([]);
     try {
       const [statsRes, partsRes] = await Promise.all([
         getEventDetailedStatsAction(eventId),
         getEventAttendanceParticipantsAction(eventId),
       ]);
 
-      if (statsRes.ok) {
-        setStats(statsRes.data);
+      if (!statsRes.ok || !partsRes.ok) {
+        const errorMsg =
+          (!statsRes.ok ? statsRes.error : "") ||
+          (!partsRes.ok ? partsRes.error : "") ||
+          "Failed to load attendance records.";
+        setLoadError(errorMsg);
+        toast.error(errorMsg);
+        return;
       }
-      if (partsRes.ok) {
-        setParticipants(partsRes.data);
-      }
+
+      setStats(statsRes.data);
+      setParticipants(partsRes.data);
     } catch {
-      toast.error("Failed to load attendance records.");
+      const errorMsg = "Failed to load attendance records.";
+      setLoadError(errorMsg);
+      toast.error(errorMsg);
     } finally {
       setIsLoading(false);
     }
   }, []);
 
+  const lastFetchedEventIdRef = useRef<string>(initialEventId);
+
+  // Fetch event data when selectedEventId changes (single fetch path on event switch)
+  useEffect(() => {
+    if (!selectedEventId) return;
+    setStoredSelectedEventId(selectedEventId);
+
+    if (selectedEventId !== lastFetchedEventIdRef.current) {
+      lastFetchedEventIdRef.current = selectedEventId;
+      refreshEventData(selectedEventId);
+    }
+  }, [selectedEventId, refreshEventData]);
+
   const handleEventChange = (newEventId: string) => {
-    setSelectedEventId(newEventId);
+    if (!newEventId || newEventId === selectedEventId) return;
+
+    setLocalEventId(newEventId);
+    setStoredSelectedEventId(newEventId);
     setSearchQuery("");
     setStatusFilter("ALL");
-    refreshEventData(newEventId);
+    setLoadError(null);
+    // Show loading spinner immediately and clear previous event's list so it does not linger under new title
+    setIsLoading(true);
+    setParticipants([]);
+
+    if (typeof window !== "undefined") {
+      const url = new URL(window.location.href);
+      url.searchParams.set("eventId", newEventId);
+      window.history.replaceState(null, "", url.toString());
+    }
   };
 
   // Manual Check-In
@@ -503,11 +556,33 @@ export function AttendanceConsoleClient({
           )}
         </div>
 
-        {/* Loading State */}
+        {/* Loading / Error / Empty States */}
         {isLoading ? (
           <div className="py-16 flex flex-col items-center justify-center text-mist gap-2">
             <Loader2 className="w-6 h-6 animate-spin text-gold-500" />
             <p className="text-xs">Loading participants...</p>
+          </div>
+        ) : loadError ? (
+          <div className="py-12 text-center text-mist space-y-3">
+            <div className="w-10 h-10 rounded-full bg-rose-50 border border-rose-200 text-rose-600 flex items-center justify-center mx-auto">
+              <AlertCircle className="w-5 h-5" />
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-navy-900">
+                Failed to load participants
+              </p>
+              <p className="text-xs text-mist max-w-sm mx-auto mt-0.5">
+                {loadError}
+              </p>
+            </div>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => refreshEventData(selectedEventId)}
+              className="text-xs font-semibold cursor-pointer"
+            >
+              Retry
+            </Button>
           </div>
         ) : sortedParticipants.length === 0 ? (
           <div className="py-12 text-center text-mist space-y-2">

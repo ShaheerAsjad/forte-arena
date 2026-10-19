@@ -714,11 +714,12 @@ export class AttendanceService {
   }
 
   /**
-   * Get event attendance statistics and recent check-ins counting people.
+   * Get lightweight attendance counts (totalApproved and totalAttended) for the scan gate.
    */
-  static async getEventStats(eventId: string) {
-    return AttendanceRepository.getEventAttendanceStats(eventId);
+  static async getEventAttendanceCounts(eventId: string) {
+    return AttendanceRepository.getEventAttendanceCounts(eventId);
   }
+
 
   /**
    * Search approved participants for manual check-in.

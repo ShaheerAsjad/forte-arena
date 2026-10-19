@@ -366,16 +366,17 @@ export class AttendanceRepository {
   }
 
   /**
-   * Get attendance summary stats and recent check-ins for an event, counting PEOPLE.
+   * Get lightweight attendance counts (totalApproved and totalAttended) for the scan gate console.
+   * Runs exactly 4 count queries in parallel, counting individual PEOPLE (solo approved + team members of approved teams).
    */
-  static async getEventAttendanceStats(eventId: string) {
+  static async getEventAttendanceCounts(
+    eventId: string
+  ): Promise<{ totalApproved: number; totalAttended: number }> {
     const [
       soloApproved,
       soloAttended,
       teamApprovedMembers,
       teamAttendedMembers,
-      recentSolo,
-      recentTeam,
     ] = await Promise.all([
       // Solo approved
       prisma.registration.count({
@@ -393,87 +394,15 @@ export class AttendanceRepository {
       prisma.teamMember.count({
         where: { team: { eventId, registrations: { some: { status: "APPROVED" } } }, attendedAt: { not: null } },
       }),
-      // Recent solo attendees
-      prisma.registration.findMany({
-        where: { eventId, status: "APPROVED", teamId: null, attendedAt: { not: null } },
-        orderBy: { attendedAt: "desc" },
-        take: 30,
-        select: {
-          id: true,
-          attendedAt: true,
-          user: {
-            select: {
-              name: true,
-              rollNumber: true,
-              department: true,
-            },
-          },
-          attendedBy: {
-            select: {
-              name: true,
-            },
-          },
-        },
-      }),
-      // Recent team attendees
-      prisma.teamMember.findMany({
-        where: { team: { eventId, registrations: { some: { status: "APPROVED" } } }, attendedAt: { not: null } },
-        orderBy: { attendedAt: "desc" },
-        take: 30,
-        select: {
-          id: true,
-          fullName: true,
-          rollNumber: true,
-          attendedAt: true,
-          team: {
-            select: {
-              name: true,
-            },
-          },
-          attendedBy: {
-            select: {
-              name: true,
-            },
-          },
-        },
-      }),
     ]);
 
-    const totalApproved = soloApproved + teamApprovedMembers;
-    const totalAttended = soloAttended + teamAttendedMembers;
-
-    // Combine and sort recent check-ins by timestamp desc
-    const combinedRecent = [
-      ...recentSolo.map((r) => ({
-        id: r.id,
-        participantType: "SOLO" as const,
-        name: r.user.name,
-        rollNumber: r.user.rollNumber,
-        department: r.user.department,
-        teamName: null,
-        attendedAt: r.attendedAt,
-        attendedBy: r.attendedBy,
-      })),
-      ...recentTeam.map((m) => ({
-        id: m.id,
-        participantType: "TEAM_MEMBER" as const,
-        name: m.fullName,
-        rollNumber: m.rollNumber,
-        department: null,
-        teamName: m.team.name,
-        attendedAt: m.attendedAt,
-        attendedBy: m.attendedBy,
-      })),
-    ]
-      .sort((a, b) => new Date(b.attendedAt!).getTime() - new Date(a.attendedAt!).getTime())
-      .slice(0, 30);
-
     return {
-      totalApproved,
-      totalAttended,
-      recentCheckIns: combinedRecent,
+      totalApproved: soloApproved + teamApprovedMembers,
+      totalAttended: soloAttended + teamAttendedMembers,
     };
   }
+
+
 
   /**
    * Search approved participants (both solo attendees and team members) by query.

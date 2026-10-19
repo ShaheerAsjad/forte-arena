@@ -7,6 +7,7 @@ import { motion, useReducedMotion, AnimatePresence } from "motion/react";
 import { Logo } from "@/components/shared/Logo";
 import { SignOutButton } from "@/app/(student)/dashboard/SignOutButton";
 import { cn } from "@/lib/utils";
+import { useSelectedEventId } from "@/features/attendance/attendance.selection";
 import {
   LayoutDashboard,
   CalendarDays,
@@ -46,6 +47,14 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const shouldReduceMotion = useReducedMotion();
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const storedEventId = useSelectedEventId();
+
+  const getNavHref = (tab: AdminNavTab) => {
+    if ((tab.href === "/admin/scan" || tab.href === "/admin/attendance") && storedEventId) {
+      return `${tab.href}?eventId=${storedEventId}`;
+    }
+    return tab.href;
+  };
 
   // Determine secondary tabs depending on active section
   const getSecondaryTabs = () => {
@@ -191,7 +200,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
                 return (
                   <Link
                     key={tab.href}
-                    href={tab.href}
+                    href={getNavHref(tab)}
                     className={cn(
                       "relative flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-colors duration-150 select-none",
                       isActive
@@ -300,7 +309,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
                       return (
                         <Link
                           key={tab.href}
-                          href={tab.href}
+                          href={getNavHref(tab)}
                           onClick={() => setIsDrawerOpen(false)}
                           className={cn(
                             "flex items-center gap-3 px-3.5 py-3 rounded-xl text-sm font-semibold transition-colors duration-150 select-none",
