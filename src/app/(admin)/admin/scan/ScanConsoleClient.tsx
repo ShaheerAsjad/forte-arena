@@ -14,6 +14,7 @@ import {
   getEventAttendanceStatsAction,
 } from "@/features/attendance/attendance.actions";
 import { formatEventDate, formatTime24 } from "@/lib/dates";
+import { getEventNotOpenCardTitle } from "@/features/attendance/attendance.config";
 import type { ManualSearchParticipant } from "@/features/attendance/repositories/attendance.repository";
 import {
   CheckCircle2,
@@ -193,7 +194,7 @@ export function ScanConsoleClient({
             data.code === "INVALID_FORMAT"
               ? "Invalid Pass Format"
               : data.code === "EVENT_NOT_OPEN"
-              ? "Event Closed"
+              ? getEventNotOpenCardTitle(currentEvent?.status)
               : "Scan Rejected",
           message: data.message,
           scannedLength: data.scannedLength,
@@ -404,7 +405,7 @@ export function ScanConsoleClient({
           <div className="w-full md:w-80">
             <div className="flex items-center justify-between gap-2 mb-1">
               <label className="block text-[11px] sm:text-xs font-bold uppercase tracking-wider text-mist">
-                Select Active Event
+                Select Event
               </label>
               {currentEvent && (
                 <span className="text-[10px] font-semibold text-navy-700 bg-navy-100/90 px-2 py-0.5 rounded-full border border-navy-200 shrink-0">

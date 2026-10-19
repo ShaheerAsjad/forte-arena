@@ -3,7 +3,7 @@ import QRCode from "qrcode";
 import { AttendanceRepository, type ParticipantTokenMatch } from "../repositories/attendance.repository";
 import { ForbiddenError, NotFoundError } from "@/lib/errors";
 import { formatTime24 } from "@/lib/dates";
-import { isEventAttendanceAllowed } from "../attendance.config";
+import { isEventAttendanceAllowed, getEventNotOpenMessage } from "../attendance.config";
 import { getEffectiveStatus } from "@/features/events/events.derived";
 import { normalizeCheckInToken, isCheckInTokenFormatValid } from "../attendance.schemas";
 
@@ -115,7 +115,7 @@ export function evaluateCheckInEligibility({
     return {
       success: false,
       code: "EVENT_NOT_OPEN",
-      message: `This event is ${effectiveStatus.toLowerCase()} — attendance can no longer be recorded for it.`,
+      message: getEventNotOpenMessage(effectiveStatus),
     };
   }
 
@@ -351,7 +351,7 @@ export class AttendanceService {
         return {
           success: false,
           code: "EVENT_NOT_OPEN",
-          message: `This event is ${effectiveStatus.toLowerCase()} — attendance can no longer be recorded for it.`,
+          message: getEventNotOpenMessage(effectiveStatus),
         };
       }
 
@@ -463,7 +463,7 @@ export class AttendanceService {
       return {
         success: false,
         code: "EVENT_NOT_OPEN",
-        message: `This event is ${effectiveStatus.toLowerCase()} — attendance can no longer be recorded for it.`,
+        message: getEventNotOpenMessage(effectiveStatus),
       };
     }
 
@@ -553,7 +553,7 @@ export class AttendanceService {
         return {
           success: false,
           code: "EVENT_NOT_OPEN",
-          message: `This event is ${effectiveStatus.toLowerCase()} — attendance can no longer be recorded for it.`,
+          message: getEventNotOpenMessage(effectiveStatus),
         };
       }
 
@@ -636,7 +636,7 @@ export class AttendanceService {
       return {
         success: false,
         code: "EVENT_NOT_OPEN",
-        message: `This event is ${effectiveStatus.toLowerCase()} — attendance can no longer be recorded for it.`,
+        message: getEventNotOpenMessage(effectiveStatus),
       };
     }
 

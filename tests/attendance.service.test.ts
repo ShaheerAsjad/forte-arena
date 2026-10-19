@@ -15,6 +15,9 @@ import {
 import {
   ATTENDANCE_ALLOWED_EVENT_STATUSES,
   isEventAttendanceAllowed,
+  getEventNotOpenMessage,
+  getEventNotOpenCardTitle,
+  sortEventsForScanner,
 } from "@/features/attendance/attendance.config";
 import {
   AttendanceRepository,
@@ -104,7 +107,7 @@ describe("Attendance Unit Tests: Event Status Gating (Part 2)", () => {
 
     expect(res.success).toBe(false);
     expect(res.code).toBe("EVENT_NOT_OPEN");
-    expect(res.message).toContain("completed");
+    expect(res.message).toBe("This event has ended — attendance can no longer be recorded.");
   });
 });
 
@@ -628,11 +631,11 @@ describe("Attendance Unit Tests: Team Member Passes & Attendance (Part 3)", () =
     // Both paths must agree that the event is not open (status: completed)
     expect(scanResult.success).toBe(false);
     expect(scanResult.code).toBe("EVENT_NOT_OPEN");
-    expect(scanResult.message).toContain("completed");
+    expect(scanResult.message).toBe("This event has ended — attendance can no longer be recorded.");
 
     expect(manualResult.success).toBe(false);
     expect(manualResult.code).toBe("EVENT_NOT_OPEN");
-    expect(manualResult.message).toContain("completed");
+    expect(manualResult.message).toBe("This event has ended — attendance can no longer be recorded.");
   });
 });
 
@@ -641,5 +644,74 @@ describe("Attendance Unit Tests: Timezone Formatting", () => {
     expect(APP_TIMEZONE).toBe("Asia/Karachi");
     const formatted = formatTime24("2026-10-18T09:30:00Z");
     expect(formatted).toBe("14:30");
+  });
+});
+
+describe("Attendance Unit Tests: Status Wording & Card Titles", () => {
+  it("returns user-friendly messages for EVENT_NOT_OPEN per event lifecycle status", () => {
+    expect(getEventNotOpenMessage("COMPLETED")).toBe(
+      "This event has ended — attendance can no longer be recorded."
+    );
+    expect(getEventNotOpenMessage("CANCELLED")).toBe(
+      "This event was cancelled."
+    );
+    expect(getEventNotOpenMessage("DRAFT")).toBe(
+      "This event is not published yet."
+    );
+    expect(getEventNotOpenMessage("OTHER")).toBe(
+      "This event is closed — attendance can no longer be recorded for it."
+    );
+  });
+
+  it("returns appropriate scan result card titles per event status", () => {
+    expect(getEventNotOpenCardTitle("COMPLETED")).toBe("Event Closed");
+    expect(getEventNotOpenCardTitle("CANCELLED")).toBe("Event Cancelled");
+    expect(getEventNotOpenCardTitle("DRAFT")).toBe("Not Published");
+    expect(getEventNotOpenCardTitle("CLOSED")).toBe("Event Closed");
+    expect(getEventNotOpenCardTitle(undefined)).toBe("Event Closed");
+  });
+});
+
+describe("Attendance Unit Tests: Scanner Event Ordering", () => {
+  it("sorts allowed events first (nearest to now), then non-allowed events (most recent first)", () => {
+    const fixedNow = new Date("2026-10-19T12:00:00Z");
+
+    const events = [
+      { id: "draft-future", title: "Draft Future", status: "DRAFT", startsAt: new Date("2026-10-25T10:00:00Z") },
+      { id: "completed-yesterday", title: "Completed Yesterday", status: "COMPLETED", startsAt: new Date("2026-10-18T10:00:00Z") },
+      { id: "pub-in-2h", title: "Published in 2 Hours", status: "PUBLISHED", startsAt: new Date("2026-10-19T14:00:00Z") },
+      { id: "closed-started-30m-ago", title: "Closed Started 30m Ago", status: "CLOSED", startsAt: new Date("2026-10-19T11:30:00Z") },
+      { id: "completed-last-week", title: "Completed Last Week", status: "COMPLETED", startsAt: new Date("2026-10-12T10:00:00Z") },
+      { id: "pub-next-week", title: "Published Next Week", status: "PUBLISHED", startsAt: new Date("2026-10-26T10:00:00Z") },
+      { id: "cancelled-today", title: "Cancelled Today", status: "CANCELLED", startsAt: new Date("2026-10-19T16:00:00Z") },
+    ];
+
+    const sorted = sortEventsForScanner(events, fixedNow);
+    const sortedIds = sorted.map((e) => e.id);
+
+    // Group 1: Allowed events (PUBLISHED, CLOSED) nearest to fixedNow (2026-10-19T12:00:00Z):
+    // - closed-started-30m-ago: |11:30 - 12:00| = 30m
+    // - pub-in-2h: |14:00 - 12:00| = 2h
+    // - pub-next-week: |2026-10-26 - 10-19| = 7 days
+    expect(sortedIds.slice(0, 3)).toEqual([
+      "closed-started-30m-ago",
+      "pub-in-2h",
+      "pub-next-week",
+    ]);
+
+    // Group 2: Non-allowed events (COMPLETED, CANCELLED, DRAFT) ordered most recent first (startsAt desc):
+    // - draft-future: 2026-10-25
+    // - cancelled-today: 2026-10-19T16:00
+    // - completed-yesterday: 2026-10-18
+    // - completed-last-week: 2026-10-12
+    expect(sortedIds.slice(3)).toEqual([
+      "draft-future",
+      "cancelled-today",
+      "completed-yesterday",
+      "completed-last-week",
+    ]);
+
+    // The default selection (first item) must be the event happening right now
+    expect(sorted[0].id).toBe("closed-started-30m-ago");
   });
 });

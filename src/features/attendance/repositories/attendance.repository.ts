@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { getEffectiveStatus } from "@/features/events/events.derived";
 import type { EventStatus } from "@/lib/db-types";
+import { sortEventsForScanner } from "@/features/attendance/attendance.config";
 
 export const attendanceRegistrationInclude = {
   event: {
@@ -570,7 +571,7 @@ export class AttendanceRepository {
       })
     );
 
-    return eventsWithCounts;
+    return sortEventsForScanner(eventsWithCounts);
   }
 
   /**

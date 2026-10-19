@@ -57,9 +57,11 @@ export function QrScanner({ onScan, isPaused = false }: QrScannerProps) {
               height: { min: 480, ideal: 720 },
             },
             qrbox: (viewfinderWidth, viewfinderHeight) => {
-              // Exact single decode region: fixed square up to 250px, never larger than viewfinder
-              const edge = Math.min(Math.min(viewfinderWidth, viewfinderHeight) - 30, 250);
-              const size = Math.max(160, Math.floor(edge));
+              const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
+              // Square decode window: ~70% of the smallest viewfinder dimension, clamped between 100px and 250px,
+              // leaving at least 12px margin on every side so html5-qrcode renders its default corner shaders.
+              const idealSize = Math.floor(minEdge * 0.7);
+              const size = Math.max(100, Math.min(idealSize, 250, minEdge - 24));
               return { width: size, height: size };
             },
             aspectRatio: 1.333333, // 4:3 native ratio to prevent stretching
@@ -131,28 +133,10 @@ export function QrScanner({ onScan, isPaused = false }: QrScannerProps) {
   }, [containerId, retryKey]);
 
   return (
-    <div className="relative w-full overflow-hidden rounded-2xl bg-navy-950 border border-navy-800 shadow-md">
-      {/* Scoped CSS to style html5-qrcode's single decode box to brand gold and remove green default artifacts */}
-      <style jsx global>{`
-        #${containerId} video {
-          object-fit: cover !important;
-          border-radius: 0.75rem !important;
-          width: 100% !important;
-        }
-        #${containerId} #qr-shaded-region {
-          border-color: rgba(245, 185, 1, 0.85) !important;
-        }
-        #${containerId} #qr-shaded-region > div {
-          border-color: #f5b901 !important;
-          border-width: 3px !important;
-          border-radius: 0.75rem !important;
-          box-shadow: 0 0 15px rgba(245, 185, 1, 0.25) !important;
-        }
-      `}</style>
-
-      {/* Viewfinder area: 4:3 compact ratio on mobile (max-h ~46vh) so result card stays immediately visible */}
-      <div className="relative aspect-[4/3] sm:aspect-[16/10] max-h-[46vh] sm:max-h-[380px] w-full flex items-center justify-center bg-black overflow-hidden">
-        <div id={containerId} className="w-full h-full object-cover" />
+    <div className="relative w-full max-w-sm sm:max-w-md mx-auto overflow-hidden rounded-2xl bg-navy-950 border border-navy-800 shadow-md">
+      {/* Viewfinder area: natural camera video height, constrained in width on mobile */}
+      <div className={`relative w-full flex items-center justify-center bg-black ${!isScanning ? "min-h-[260px]" : ""}`}>
+        <div id={containerId} className="w-full" />
 
         {/* Loading overlay */}
         {isInitializing && (
