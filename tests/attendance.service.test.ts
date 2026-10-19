@@ -3,6 +3,14 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/prisma", () => ({ prisma: {} }));
 
+import { prisma } from "@/lib/prisma";
+import {
+  ATTENDANCE_CSV_HEADERS,
+  buildAttendanceCsvRows,
+  generateAttendanceCsv,
+} from "@/features/attendance/attendance.csv";
+import type { AttendanceParticipantItem } from "@/features/attendance/repositories/attendance.repository";
+
 import {
   generateCheckInToken,
   evaluateCheckInEligibility,
@@ -33,6 +41,28 @@ type MockRegistration = NonNullable<
 type MockTeamMember = NonNullable<
   Awaited<ReturnType<typeof AttendanceRepository.findTeamMemberById>>
 >;
+
+type MockCountArgs = {
+  where?: {
+    attendanceMethod?: string | null;
+    status?: string;
+    attendedAt?: { not?: null } | null;
+  };
+};
+
+type MockPrisma = {
+  registration: {
+    groupBy: ReturnType<typeof vi.fn>;
+    count: ReturnType<typeof vi.fn>;
+    update: ReturnType<typeof vi.fn>;
+  };
+  teamMember: {
+    count: ReturnType<typeof vi.fn>;
+    update: ReturnType<typeof vi.fn>;
+  };
+};
+
+const mockPrisma = prisma as unknown as MockPrisma;
 
 describe("Attendance Unit Tests: Token Generation & Normalization", () => {
   it("generates URL-safe tokens of exactly 32 characters matching base64url format", () => {
@@ -715,3 +745,499 @@ describe("Attendance Unit Tests: Scanner Event Ordering", () => {
     expect(sorted[0].id).toBe("closed-started-30m-ago");
   });
 });
+
+describe("Attendance Unit Tests: Summary Counts & Method Split", () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("calculates summary counts for solo and team members with QR, Manual, and Earlier split", async () => {
+    mockPrisma.registration = {
+      groupBy: vi.fn().mockResolvedValue([
+        { status: "PENDING", _count: { _all: 3 } },
+        { status: "APPROVED", _count: { _all: 10 } },
+        { status: "REJECTED", _count: { _all: 2 } },
+        { status: "WITHDRAWN", _count: { _all: 1 } },
+      ]),
+      count: vi.fn().mockImplementation((args: MockCountArgs) => {
+        const where = args?.where || {};
+        if (where.attendanceMethod === "QR") return Promise.resolve(4);
+        if (where.attendanceMethod === "MANUAL") return Promise.resolve(2);
+        if (where.attendanceMethod === null && where.attendedAt) return Promise.resolve(1);
+        if (where.status === "APPROVED") return Promise.resolve(8); // solo approved
+        return Promise.resolve(0);
+      }),
+      update: vi.fn(),
+    };
+
+    mockPrisma.teamMember = {
+      count: vi.fn().mockImplementation((args: MockCountArgs) => {
+        const where = args?.where || {};
+        if (where.attendanceMethod === "QR") return Promise.resolve(3);
+        if (where.attendanceMethod === "MANUAL") return Promise.resolve(1);
+        if (where.attendanceMethod === null && where.attendedAt) return Promise.resolve(0);
+        return Promise.resolve(6); // team approved members
+      }),
+      update: vi.fn(),
+    };
+
+    const stats = await AttendanceRepository.getEventDetailedStats("test-event-1");
+
+    // Applications total: 3 + 10 + 2 + 1 = 16
+    expect(stats.applications.total).toBe(16);
+    expect(stats.applications.pending).toBe(3);
+    expect(stats.applications.approved).toBe(10);
+    expect(stats.applications.rejected).toBe(2);
+    expect(stats.applications.withdrawn).toBe(1);
+
+    // Approved people: 8 solo + 6 team members = 14
+    expect(stats.approvedPeople).toBe(14);
+
+    // Present split: QR = 4 + 3 = 7, Manual = 2 + 1 = 3, Earlier = 1 + 0 = 1
+    expect(stats.presentSplit.qr).toBe(7);
+    expect(stats.presentSplit.manual).toBe(3);
+    expect(stats.presentSplit.earlier).toBe(1);
+
+    // Total present: 7 + 3 + 1 = 11
+    expect(stats.presentPeople).toBe(11);
+
+    // Not yet present: 14 - 11 = 3
+    expect(stats.notYetPresent).toBe(3);
+
+    // Percentage: Math.round((11 / 14) * 100) = 79%
+    expect(stats.percentage).toBe(79);
+  });
+
+  it("handles empty event with zero registrations gracefully", async () => {
+    mockPrisma.registration = {
+      groupBy: vi.fn().mockResolvedValue([]),
+      count: vi.fn().mockResolvedValue(0),
+      update: vi.fn(),
+    };
+    mockPrisma.teamMember = {
+      count: vi.fn().mockResolvedValue(0),
+      update: vi.fn(),
+    };
+
+    const stats = await AttendanceRepository.getEventDetailedStats("empty-event");
+    expect(stats.applications.total).toBe(0);
+    expect(stats.approvedPeople).toBe(0);
+    expect(stats.presentPeople).toBe(0);
+    expect(stats.notYetPresent).toBe(0);
+    expect(stats.percentage).toBe(0);
+    expect(stats.presentSplit).toEqual({ qr: 0, manual: 0, earlier: 0 });
+  });
+});
+
+describe("Attendance Unit Tests: Method Recording (QR vs MANUAL)", () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("checkInByToken sets attendanceMethod to QR for solo participant", async () => {
+    const markSoloSpy = vi.spyOn(AttendanceRepository, "markRegistrationAttended").mockResolvedValue(1);
+    const soloToken = "a".repeat(32);
+
+    const mockReg: ParticipantTokenMatch = {
+      type: "REGISTRATION",
+      registration: {
+        id: "reg-solo-1",
+        eventId: "event-1",
+        teamId: null,
+        status: "APPROVED" as const,
+        checkInToken: soloToken,
+        attendedAt: null,
+        attendedById: null,
+        attendanceMethod: null,
+        event: { id: "event-1", title: "Live Hackathon", status: "PUBLISHED" as const },
+        user: { name: "Solo Student", rollNumber: "CS-100" },
+        team: null,
+      } as unknown as MockRegistration,
+    };
+
+    vi.spyOn(AttendanceRepository, "findByToken").mockResolvedValue(mockReg);
+
+    const result = await AttendanceService.checkInByToken({
+      token: soloToken,
+      eventId: "event-1",
+      organizerId: "org-1",
+    });
+
+    expect(result.success).toBe(true);
+    expect(markSoloSpy).toHaveBeenCalledTimes(1);
+    expect(markSoloSpy).toHaveBeenCalledWith("reg-solo-1", "org-1", expect.any(Date), "QR");
+  });
+
+  it("checkInByToken sets attendanceMethod to QR for team member", async () => {
+    const markTeamSpy = vi.spyOn(AttendanceRepository, "markTeamMemberAttended").mockResolvedValue(1);
+    const teamMemberToken = "b".repeat(32);
+
+    const mockMemberMatch: ParticipantTokenMatch = {
+      type: "TEAM_MEMBER",
+      teamMember: {
+        id: "member-qr-1",
+        teamId: "team-1",
+        fullName: "Team Member One",
+        rollNumber: "CS-200",
+        checkInToken: teamMemberToken,
+        attendedAt: null,
+        attendedById: null,
+        attendanceMethod: null,
+        team: {
+          id: "team-1",
+          name: "Alpha Squad",
+          eventId: "event-1",
+          event: { id: "event-1", title: "Live Hackathon", status: "PUBLISHED" as const },
+          registrations: [{ id: "reg-team-1", status: "APPROVED" as const }],
+          members: [{ id: "member-qr-1", attendedAt: null }],
+        },
+      } as unknown as MockTeamMember,
+    };
+
+    vi.spyOn(AttendanceRepository, "findByToken").mockResolvedValue(mockMemberMatch);
+
+    const result = await AttendanceService.checkInByToken({
+      token: teamMemberToken,
+      eventId: "event-1",
+      organizerId: "org-1",
+    });
+
+    expect(result.success).toBe(true);
+    expect(markTeamSpy).toHaveBeenCalledTimes(1);
+    expect(markTeamSpy).toHaveBeenCalledWith("member-qr-1", "org-1", expect.any(Date), "QR");
+  });
+
+  it("checkInManually sets attendanceMethod to MANUAL for solo participant", async () => {
+    const markSoloSpy = vi.spyOn(AttendanceRepository, "markRegistrationAttended").mockResolvedValue(1);
+
+    const mockReg = {
+      id: "reg-manual-solo",
+      eventId: "event-1",
+      teamId: null,
+      status: "APPROVED" as const,
+      attendedAt: null,
+      attendedById: null,
+      attendanceMethod: null,
+      event: { id: "event-1", title: "Live Hackathon", status: "PUBLISHED" as const },
+      user: { name: "Manual Solo Student", rollNumber: "CS-300" },
+      team: null,
+    };
+
+    vi.spyOn(AttendanceRepository, "findById").mockResolvedValue(mockReg as unknown as MockRegistration);
+
+    const result = await AttendanceService.checkInManually({
+      participantId: "reg-manual-solo",
+      participantType: "SOLO",
+      eventId: "event-1",
+      organizerId: "org-1",
+    });
+
+    expect(result.success).toBe(true);
+    expect(markSoloSpy).toHaveBeenCalledTimes(1);
+    expect(markSoloSpy).toHaveBeenCalledWith("reg-manual-solo", "org-1", expect.any(Date), "MANUAL");
+  });
+
+  it("checkInManually sets attendanceMethod to MANUAL for team member", async () => {
+    const markTeamSpy = vi.spyOn(AttendanceRepository, "markTeamMemberAttended").mockResolvedValue(1);
+
+    const mockMember = {
+      id: "member-manual-1",
+      teamId: "team-1",
+      fullName: "Manual Team Member",
+      rollNumber: "CS-400",
+      attendedAt: null,
+      attendedById: null,
+      attendanceMethod: null,
+      team: {
+        id: "team-1",
+        name: "Alpha Squad",
+        eventId: "event-1",
+        event: { id: "event-1", title: "Live Hackathon", status: "PUBLISHED" as const },
+        registrations: [{ id: "reg-team-1", status: "APPROVED" as const }],
+        members: [{ id: "member-manual-1", attendedAt: null }],
+      },
+    };
+
+    vi.spyOn(AttendanceRepository, "findTeamMemberById").mockResolvedValue(mockMember as unknown as MockTeamMember);
+
+    const result = await AttendanceService.checkInManually({
+      participantId: "member-manual-1",
+      participantType: "TEAM_MEMBER",
+      eventId: "event-1",
+      organizerId: "org-1",
+    });
+
+    expect(result.success).toBe(true);
+    expect(markTeamSpy).toHaveBeenCalledTimes(1);
+    expect(markTeamSpy).toHaveBeenCalledWith("member-manual-1", "org-1", expect.any(Date), "MANUAL");
+  });
+});
+
+describe("Attendance Unit Tests: Undo Clears Method", () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("undoCheckIn clears attendanceMethod to null for solo participant", async () => {
+    const clearSoloSpy = vi.spyOn(AttendanceRepository, "clearRegistrationAttended").mockResolvedValue({
+      id: "reg-solo-undo",
+      eventId: "event-1",
+    });
+
+    const result = await AttendanceService.undoCheckIn({
+      participantId: "reg-solo-undo",
+      participantType: "SOLO",
+    });
+
+    expect(result.id).toBe("reg-solo-undo");
+    expect(clearSoloSpy).toHaveBeenCalledWith("reg-solo-undo");
+  });
+
+  it("undoCheckIn clears attendanceMethod to null for team member", async () => {
+    const clearTeamSpy = vi.spyOn(AttendanceRepository, "clearTeamMemberAttended").mockResolvedValue({
+      id: "member-undo-1",
+      eventId: "event-1",
+    });
+
+    const result = await AttendanceService.undoCheckIn({
+      participantId: "member-undo-1",
+      participantType: "TEAM_MEMBER",
+    });
+
+    expect(result.id).toBe("member-undo-1");
+    expect(clearTeamSpy).toHaveBeenCalledWith("member-undo-1");
+  });
+
+  it("clearRegistrationAttended passes attendanceMethod: null and attendedAt: null in atomic update", async () => {
+    const updateSpy = vi.fn().mockResolvedValue({ id: "reg-1", eventId: "event-1" });
+    mockPrisma.registration = {
+      groupBy: vi.fn(),
+      count: vi.fn(),
+      update: updateSpy,
+    };
+
+    await AttendanceRepository.clearRegistrationAttended("reg-1");
+
+    expect(updateSpy).toHaveBeenCalledWith({
+      where: { id: "reg-1" },
+      data: {
+        attendedAt: null,
+        attendedById: null,
+        attendanceMethod: null,
+      },
+      select: { id: true, eventId: true },
+    });
+  });
+
+  it("clearTeamMemberAttended passes attendanceMethod: null and attendedAt: null in atomic update", async () => {
+    const updateSpy = vi.fn().mockResolvedValue({
+      id: "member-1",
+      team: { eventId: "event-1" },
+    });
+    mockPrisma.teamMember = {
+      count: vi.fn(),
+      update: updateSpy,
+    };
+
+    await AttendanceRepository.clearTeamMemberAttended("member-1");
+
+    expect(updateSpy).toHaveBeenCalledWith({
+      where: { id: "member-1" },
+      data: {
+        attendedAt: null,
+        attendedById: null,
+        attendanceMethod: null,
+      },
+      select: {
+        id: true,
+        team: { select: { eventId: true } },
+      },
+    });
+  });
+});
+
+describe("Attendance Unit Tests: Manual Check-In Gated by Event Status", () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  const statusesToBlock = ["COMPLETED", "CANCELLED", "DRAFT"] as const;
+
+  for (const status of statusesToBlock) {
+    it(`blocks manual check-in when event status is ${status}`, async () => {
+      const markSoloSpy = vi.spyOn(AttendanceRepository, "markRegistrationAttended");
+      const markTeamSpy = vi.spyOn(AttendanceRepository, "markTeamMemberAttended");
+
+      const mockReg = {
+        id: "reg-blocked-status",
+        eventId: "event-blocked",
+        status: "APPROVED" as const,
+        attendedAt: null,
+        attendedById: null,
+        event: { id: "event-blocked", title: "Finished Event", status },
+        user: { name: "Blocked Student", rollNumber: "CS-500" },
+        team: null,
+      };
+
+      vi.spyOn(AttendanceRepository, "findById").mockResolvedValue(mockReg as unknown as MockRegistration);
+
+      const result = await AttendanceService.checkInManually({
+        participantId: "reg-blocked-status",
+        participantType: "SOLO",
+        eventId: "event-blocked",
+        organizerId: "org-1",
+      });
+
+      expect(result.success).toBe(false);
+      expect(result.code).toBe("EVENT_NOT_OPEN");
+      expect(markSoloSpy).not.toHaveBeenCalled();
+      expect(markTeamSpy).not.toHaveBeenCalled();
+    });
+  }
+});
+
+describe("Attendance Unit Tests: CSV Rows & Export Generation", () => {
+  const participants: AttendanceParticipantItem[] = [
+    {
+      id: "p1",
+      participantType: "SOLO",
+      name: "Alice Khan",
+      rollNumber: "CS-2023-01",
+      department: "Computer Science",
+      teamName: null,
+      attendedAt: new Date("2026-10-19T09:30:00Z"),
+      attendedBy: { name: "Organizer Staff" },
+      attendanceMethod: "QR",
+    },
+    {
+      id: "p2",
+      participantType: "SOLO",
+      name: "Bob Smith",
+      rollNumber: "EE-2023-02",
+      department: "Electrical Eng",
+      teamName: null,
+      attendedAt: new Date("2026-10-19T09:30:00Z"),
+      attendedBy: { name: "Organizer Staff" },
+      attendanceMethod: "MANUAL",
+    },
+    {
+      id: "p3",
+      participantType: "SOLO",
+      name: "Charlie Davis",
+      rollNumber: "ME-2023-03",
+      department: "Mechanical Eng",
+      teamName: null,
+      attendedAt: new Date("2026-10-19T09:30:00Z"),
+      attendedBy: { name: "Organizer Staff" },
+      attendanceMethod: null, // Earlier / legacy check-in
+    },
+    {
+      id: "p4",
+      participantType: "TEAM_MEMBER",
+      name: "Dave Wilson",
+      rollNumber: "SE-2023-04",
+      department: null,
+      teamName: "Code Warriors",
+      attendedAt: new Date("2026-10-19T09:30:00Z"),
+      attendedBy: { name: "Organizer Staff" },
+      attendanceMethod: "QR",
+    },
+    {
+      id: "p5",
+      participantType: "TEAM_MEMBER",
+      name: "Eve Taylor",
+      rollNumber: "SE-2023-05",
+      department: null,
+      teamName: "Code Warriors",
+      attendedAt: null,
+      attendedBy: null,
+      attendanceMethod: null, // Not yet present
+    },
+  ];
+
+  it("exports exact ATTENDANCE_CSV_HEADERS", () => {
+    expect(ATTENDANCE_CSV_HEADERS).toEqual([
+      "Name",
+      "Roll Number",
+      "Department",
+      "Team",
+      "Present",
+      "Time",
+      "Method",
+    ]);
+  });
+
+  it("builds correct CSV rows matching specifications", () => {
+    const rows = buildAttendanceCsvRows(participants);
+    expect(rows).toHaveLength(5);
+
+    // Solo QR: Yes, 14:30 in Asia/Karachi, QR
+    expect(rows[0]).toEqual([
+      "Alice Khan",
+      "CS-2023-01",
+      "Computer Science",
+      "",
+      "Yes",
+      "14:30",
+      "QR",
+    ]);
+
+    // Solo MANUAL: Yes, 14:30, Manual
+    expect(rows[1]).toEqual([
+      "Bob Smith",
+      "EE-2023-02",
+      "Electrical Eng",
+      "",
+      "Yes",
+      "14:30",
+      "Manual",
+    ]);
+
+    // Solo Earlier / Unknown: Yes, 14:30, Earlier / Unknown
+    expect(rows[2]).toEqual([
+      "Charlie Davis",
+      "ME-2023-03",
+      "Mechanical Eng",
+      "",
+      "Yes",
+      "14:30",
+      "Earlier / Unknown",
+    ]);
+
+    // Team Member QR: Yes, 14:30, QR, team name present, department empty
+    expect(rows[3]).toEqual([
+      "Dave Wilson",
+      "SE-2023-04",
+      "",
+      "Code Warriors",
+      "Yes",
+      "14:30",
+      "QR",
+    ]);
+
+    // Team Member Not present: No, empty time, empty method
+    expect(rows[4]).toEqual([
+      "Eve Taylor",
+      "SE-2023-05",
+      "",
+      "Code Warriors",
+      "No",
+      "",
+      "",
+    ]);
+  });
+
+  it("generateAttendanceCsv produces full RFC 4180 CSV string with CRLF line breaks", () => {
+    const csv = generateAttendanceCsv(participants);
+    const lines = csv.split("\r\n");
+
+    expect(lines).toHaveLength(6); // 1 header + 5 rows
+    expect(lines[0]).toBe("Name,Roll Number,Department,Team,Present,Time,Method");
+    expect(lines[1]).toBe("Alice Khan,CS-2023-01,Computer Science,,Yes,14:30,QR");
+    expect(lines[2]).toBe("Bob Smith,EE-2023-02,Electrical Eng,,Yes,14:30,Manual");
+    expect(lines[3]).toBe("Charlie Davis,ME-2023-03,Mechanical Eng,,Yes,14:30,Earlier / Unknown");
+    expect(lines[4]).toBe("Dave Wilson,SE-2023-04,,Code Warriors,Yes,14:30,QR");
+    expect(lines[5]).toBe("Eve Taylor,SE-2023-05,,Code Warriors,No,,");
+  });
+});
+

@@ -385,12 +385,13 @@ export class AttendanceService {
         };
       }
 
-      // Mark attended atomically
+      // Mark attended atomically with method "QR"
       const attendedAt = new Date();
       const updatedCount = await AttendanceRepository.markTeamMemberAttended(
         teamMember.id,
         organizerId,
-        attendedAt
+        attendedAt,
+        "QR"
       );
 
       if (updatedCount === 0) {
@@ -497,7 +498,8 @@ export class AttendanceService {
     const updatedCount = await AttendanceRepository.markRegistrationAttended(
       registration.id,
       organizerId,
-      attendedAt
+      attendedAt,
+      "QR"
     );
 
     if (updatedCount === 0) {
@@ -582,7 +584,12 @@ export class AttendanceService {
       }
 
       const attendedAt = new Date();
-      const count = await AttendanceRepository.markTeamMemberAttended(member.id, organizerId, attendedAt);
+      const count = await AttendanceRepository.markTeamMemberAttended(
+        member.id,
+        organizerId,
+        attendedAt,
+        "MANUAL"
+      );
       if (count === 0) {
         const fresh = await AttendanceRepository.findTeamMemberById(member.id);
         const original = fresh?.attendedAt || attendedAt;
@@ -663,7 +670,12 @@ export class AttendanceService {
     }
 
     const attendedAt = new Date();
-    const count = await AttendanceRepository.markRegistrationAttended(registration.id, organizerId, attendedAt);
+    const count = await AttendanceRepository.markRegistrationAttended(
+      registration.id,
+      organizerId,
+      attendedAt,
+      "MANUAL"
+    );
     if (count === 0) {
       const fresh = await AttendanceRepository.findById(registration.id);
       const original = fresh?.attendedAt || attendedAt;
@@ -728,5 +740,26 @@ export class AttendanceService {
    */
   static async getScannableEvents() {
     return AttendanceRepository.getScannableEvents();
+  }
+
+  /**
+   * Get all events with at least one registration of any status for the Attendance page.
+   */
+  static async getEventsWithAnyRegistrations() {
+    return AttendanceRepository.getEventsWithAnyRegistrations();
+  }
+
+  /**
+   * Get detailed attendance stats (applications, approved, present split QR/manual/earlier) for an event.
+   */
+  static async getEventDetailedStats(eventId: string) {
+    return AttendanceRepository.getEventDetailedStats(eventId);
+  }
+
+  /**
+   * Get all approved participants (solo attendees and team members) for an event.
+   */
+  static async getEventAttendanceParticipants(eventId: string) {
+    return AttendanceRepository.getEventAttendanceParticipants(eventId);
   }
 }

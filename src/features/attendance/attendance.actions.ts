@@ -44,6 +44,7 @@ export async function scanCheckInAction(
 
     if (result.success && !result.alreadyCheckedIn) {
       revalidatePath("/admin/scan");
+      revalidatePath("/admin/attendance");
       revalidatePath("/admin/registrations");
       revalidatePath(`/admin/events/${eventId}/registrations`);
     }
@@ -88,6 +89,7 @@ export async function manualCheckInAction(
 
     if (result.success && !result.alreadyCheckedIn) {
       revalidatePath("/admin/scan");
+      revalidatePath("/admin/attendance");
       revalidatePath("/admin/registrations");
       revalidatePath(`/admin/events/${eventId}/registrations`);
     }
@@ -151,6 +153,7 @@ export async function undoCheckInAction(
     const updated = await AttendanceService.undoCheckIn(parsed.data);
 
     revalidatePath("/admin/scan");
+    revalidatePath("/admin/attendance");
     revalidatePath("/admin/registrations");
     revalidatePath(`/admin/events/${updated.eventId}/registrations`);
 
@@ -191,3 +194,56 @@ export async function getEventAttendanceStatsAction(
     return { ok: false, error: message };
   }
 }
+
+/**
+ * Server action to get detailed attendance stats for the Attendance page.
+ */
+export async function getEventDetailedStatsAction(
+  eventId: string
+): Promise<ActionResult<Awaited<ReturnType<typeof AttendanceService.getEventDetailedStats>>>> {
+  try {
+    await requireRole(["ORGANIZER", "ADMIN"]);
+
+    if (!eventId) {
+      return { ok: false, error: "Event ID is required" };
+    }
+
+    const stats = await AttendanceService.getEventDetailedStats(eventId);
+    return { ok: true, data: stats };
+  } catch (err) {
+    const message =
+      err instanceof AppError
+        ? err.message
+        : err instanceof Error
+        ? err.message
+        : "Failed to fetch event detailed stats";
+    return { ok: false, error: message };
+  }
+}
+
+/**
+ * Server action to get all approved participants for the Attendance page.
+ */
+export async function getEventAttendanceParticipantsAction(
+  eventId: string
+): Promise<ActionResult<Awaited<ReturnType<typeof AttendanceService.getEventAttendanceParticipants>>>> {
+  try {
+    await requireRole(["ORGANIZER", "ADMIN"]);
+
+    if (!eventId) {
+      return { ok: false, error: "Event ID is required" };
+    }
+
+    const participants = await AttendanceService.getEventAttendanceParticipants(eventId);
+    return { ok: true, data: participants };
+  } catch (err) {
+    const message =
+      err instanceof AppError
+        ? err.message
+        : err instanceof Error
+        ? err.message
+        : "Failed to fetch attendance participants";
+    return { ok: false, error: message };
+  }
+}
+

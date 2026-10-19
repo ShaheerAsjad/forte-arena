@@ -21,6 +21,7 @@ import {
   MessageSquareQuote,
   Home,
   QrCode,
+  UserCheck,
 } from "lucide-react";
 
 interface AdminNavTab {
@@ -33,6 +34,7 @@ interface AdminNavTab {
 const ADMIN_PRIMARY_TABS: AdminNavTab[] = [
   { href: "/admin", label: "Overview", icon: LayoutDashboard, exact: true },
   { href: "/admin/scan", label: "Scan Entry", icon: QrCode },
+  { href: "/admin/attendance", label: "Attendance", icon: UserCheck },
   { href: "/admin/events", label: "Events", icon: CalendarDays },
   { href: "/admin/registrations", label: "Registrations", icon: Users },
   { href: "/admin/results", label: "Results", icon: Trophy },

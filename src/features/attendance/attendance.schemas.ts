@@ -26,6 +26,11 @@ export function isCheckInTokenFormatValid(token: string): boolean {
   return CHECK_IN_TOKEN_REGEX.test(token);
 }
 
+export const ATTENDANCE_METHODS = ["QR", "MANUAL"] as const;
+export type AttendanceMethod = (typeof ATTENDANCE_METHODS)[number];
+export const attendanceMethodSchema = z.enum(ATTENDANCE_METHODS);
+
+
 export const scanCheckInSchema = z.object({
   token: z.string().trim().min(1, "QR token is required"),
   eventId: z.string().trim().min(1, "Event ID is required"),

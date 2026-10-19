@@ -122,6 +122,7 @@ model Registration {
   checkInToken    String?            @unique
   attendedAt      DateTime?
   attendedById    String?
+  attendanceMethod String?
   createdAt       DateTime           @default(now())
   updatedAt       DateTime           @updatedAt
 
@@ -167,6 +168,7 @@ model TeamMember {
   checkInToken String?   @unique
   attendedAt   DateTime?
   attendedById String?
+  attendanceMethod String? @map("attendance_method")
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 
