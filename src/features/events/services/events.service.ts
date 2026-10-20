@@ -20,6 +20,14 @@ export class EventsService {
   static decorateEvent = decorateEvent;
 
   /**
+   * All public events for directory search & filtering
+   */
+  static async getAllPublicEvents() {
+    const events = await EventsRepository.getAllPublicEvents();
+    return events.map((e) => this.decorateEvent(e));
+  }
+
+  /**
    * Featured events for homepage
    */
   static async getFeaturedEvents(limit = 6) {

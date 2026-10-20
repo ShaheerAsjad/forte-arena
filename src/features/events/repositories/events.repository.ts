@@ -75,6 +75,20 @@ export interface EventsQueryFilters {
 
 export class EventsRepository {
   /**
+   * Fetch all public events for the events directory
+   */
+  static async getAllPublicEvents(): Promise<EventCardItem[]> {
+    await connection();
+    return prisma.event.findMany({
+      where: {
+        status: { in: ["PUBLISHED", "CLOSED", "COMPLETED"] },
+      },
+      select: eventCardSelect,
+      orderBy: { startsAt: "asc" },
+    });
+  }
+
+  /**
    * Fetch featured events for the home hero/carousel
    */
   static async getFeaturedEvents(limit = 6): Promise<EventCardItem[]> {

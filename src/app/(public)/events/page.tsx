@@ -1,23 +1,24 @@
 import { Suspense } from "react";
-import Link from "next/link";
+import type { Metadata } from "next";
 import { PageShell } from "@/components/layout/PageShell";
-import { EventsFilterBar } from "@/components/shared/EventsFilterBar";
-import { EventCard } from "@/components/shared/EventCard";
-import { EmptyState } from "@/components/ui/EmptyState";
-import { Button } from "@/components/ui/Button";
+import { EventsExplorerClient } from "@/features/events/components/EventsExplorerClient";
+import { EventsService } from "@/features/events/services/events.service";
 import { Card } from "@/components/ui/Card";
 import { Skeleton } from "@/components/ui/Skeleton";
-import { Stagger, StaggerItem } from "@/components/motion/Stagger";
-import { EventsService } from "@/features/events/services/events.service";
-import { ChevronLeft, ChevronRight, Inbox } from "lucide-react";
-import type { EventCategory, EventStatus } from "@/lib/db-types";
+
+export const metadata: Metadata = {
+  title: "Festival Competitions & Arenas | Forté Arena",
+  description:
+    "Discover upcoming tournaments, hackathons, showcases, and athletic events across campus.",
+};
 
 interface EventsPageProps {
   searchParams: Promise<{
     q?: string;
     category?: string;
     status?: string;
-    page?: string;
+    type?: string;
+    sort?: string;
   }>;
 }
 
@@ -29,162 +30,53 @@ export default function EventsPage({ searchParams }: EventsPageProps) {
       description="Discover upcoming tournaments, hackathons, showcases, and athletic events across campus."
     >
       <div className="space-y-8 pb-16">
-        {/* Interactive Filter Bar */}
-        <Suspense fallback={<div className="h-20 bg-white rounded-2xl animate-pulse" />}>
-          <EventsFilterBar />
-        </Suspense>
-
-        {/* Suspenseful Events Grid */}
         <Suspense fallback={<EventsListSkeleton />}>
-          <EventsGridLoader searchParams={searchParams} />
+          <EventsDirectory searchParams={searchParams} />
         </Suspense>
       </div>
     </PageShell>
   );
 }
 
-// -------------------------------------------------------------
-// Async Events Loader
-// -------------------------------------------------------------
-
-async function EventsGridLoader({
+async function EventsDirectory({
   searchParams,
 }: {
   searchParams: EventsPageProps["searchParams"];
 }) {
-  const params = await searchParams;
-  const page = params.page ? parseInt(params.page, 10) : 1;
-  const category =
-    params.category && params.category !== "ALL"
-      ? (params.category as EventCategory)
-      : undefined;
-  const status = params.status ? (params.status as EventStatus) : undefined;
-  const search = params.q || undefined;
+  const [params, events] = await Promise.all([
+    searchParams,
+    EventsService.getAllPublicEvents(),
+  ]);
 
-  const result = await EventsService.getPaginatedEvents({
-    page,
-    pageSize: 9,
-    category,
-    status,
-    search,
-  });
-
-  const { events, total, totalPages, currentPage } = result;
-
-  if (events.length === 0) {
-    return (
-      <EmptyState
-        icon={<Inbox className="w-10 h-10 text-mist" />}
-        title="No Competitions Found"
-        description="We couldn't find any events matching your selected search criteria or filters."
-        action={
-          <Link href="/events">
-            <Button variant="outline" size="sm">
-              Clear Filters
-            </Button>
-          </Link>
-        }
-      />
-    );
-  }
-
-  // Construct pagination URL generator
-  const createPageUrl = (targetPage: number) => {
-    const sp = new URLSearchParams();
-    if (params.q) sp.set("q", params.q);
-    if (params.category && params.category !== "ALL") sp.set("category", params.category);
-    if (params.status) sp.set("status", params.status);
-    sp.set("page", String(targetPage));
-    return `/events?${sp.toString()}`;
-  };
-
-  return (
-    <div className="space-y-10">
-      {/* Result Count Status */}
-      <div className="flex items-center justify-between text-xs sm:text-sm text-mist px-1">
-        <span>
-          Showing <span className="font-bold text-navy-950">{events.length}</span> of{" "}
-          <span className="font-bold text-navy-950">{total}</span> competitions
-        </span>
-        <span>
-          Page {currentPage} of {totalPages}
-        </span>
-      </div>
-
-      {/* Grid */}
-      <Stagger className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-7">
-        {events.map((event) => (
-          <StaggerItem key={event.item.id}>
-            <EventCard event={event} />
-          </StaggerItem>
-        ))}
-      </Stagger>
-
-      {/* Pagination Controls */}
-      {totalPages > 1 && (
-        <div className="flex items-center justify-center gap-2 pt-6 border-t border-navy-100">
-          {currentPage > 1 ? (
-            <Link href={createPageUrl(currentPage - 1)}>
-              <Button variant="outline" size="sm" className="gap-1">
-                <ChevronLeft className="w-4 h-4" />
-                Previous
-              </Button>
-            </Link>
-          ) : (
-            <Button variant="outline" size="sm" disabled className="gap-1 opacity-50 cursor-not-allowed">
-              <ChevronLeft className="w-4 h-4" />
-              Previous
-            </Button>
-          )}
-
-          <div className="flex items-center gap-1.5 px-3 text-xs sm:text-sm font-semibold text-navy-950">
-            {Array.from({ length: totalPages }).map((_, idx) => {
-              const p = idx + 1;
-              const isCurrent = p === currentPage;
-              return (
-                <Link key={p} href={createPageUrl(p)}>
-                  <span
-                    className={`inline-flex items-center justify-center w-8 h-8 rounded-full text-xs font-bold transition-colors ${
-                      isCurrent
-                        ? "bg-navy-900 text-ivory shadow-xs"
-                        : "hover:bg-navy-100 text-ink/70"
-                    }`}
-                  >
-                    {p}
-                  </span>
-                </Link>
-              );
-            })}
-          </div>
-
-          {currentPage < totalPages ? (
-            <Link href={createPageUrl(currentPage + 1)}>
-              <Button variant="outline" size="sm" className="gap-1">
-                Next
-                <ChevronRight className="w-4 h-4" />
-              </Button>
-            </Link>
-          ) : (
-            <Button variant="outline" size="sm" disabled className="gap-1 opacity-50 cursor-not-allowed">
-              Next
-              <ChevronRight className="w-4 h-4" />
-            </Button>
-          )}
-        </div>
-      )}
-    </div>
-  );
+  return <EventsExplorerClient events={events} initialParams={params} />;
 }
 
 function EventsListSkeleton() {
   return (
     <div className="space-y-6">
+      {/* Search & Filter Bar Skeleton */}
+      <div className="bg-white/95 rounded-3xl border border-navy-100 p-6 space-y-4 shadow-sm animate-pulse">
+        <div className="h-12 bg-navy-50 rounded-2xl w-full" />
+        <div className="flex items-center gap-2 overflow-hidden">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} className="h-10 w-28 bg-navy-50 rounded-xl shrink-0" />
+          ))}
+        </div>
+        <div className="hidden md:grid md:grid-cols-3 gap-3 pt-2 border-t border-navy-50">
+          <div className="h-10 bg-navy-50 rounded-xl" />
+          <div className="h-10 bg-navy-50 rounded-xl" />
+          <div className="h-10 bg-navy-50 rounded-xl" />
+        </div>
+      </div>
+
       <div className="flex items-center justify-between px-1">
         <Skeleton className="h-4 w-48 rounded-md" />
         <Skeleton className="h-4 w-24 rounded-md" />
       </div>
+
+      {/* Grid Skeleton */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-7">
-        {Array.from({ length: 9 }).map((_, i) => (
+        {Array.from({ length: 6 }).map((_, i) => (
           <Card
             key={i}
             className="h-full flex flex-col overflow-hidden border border-navy-100 bg-white"
