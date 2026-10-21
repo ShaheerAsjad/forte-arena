@@ -36,6 +36,11 @@ export function SiteFooter() {
                 </Link>
               </li>
               <li>
+                <Link href="/leaderboard" className="hover:text-gold-400 transition-colors">
+                  Leaderboard
+                </Link>
+              </li>
+              <li>
                 <Link href="/about" className="hover:text-gold-400 transition-colors">
                   About the Fest
                 </Link>

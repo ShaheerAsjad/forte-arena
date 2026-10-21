@@ -11,6 +11,7 @@ import {
   ArrowRight,
   Calendar,
   Trophy,
+  Award,
   Info,
   LayoutDashboard,
   LogOut,
@@ -27,6 +28,7 @@ const NAV_LINKS = [
   { href: "/", label: "Home" },
   { href: "/events", label: "Events", icon: Calendar },
   { href: "/results", label: "Results", icon: Trophy },
+  { href: "/leaderboard", label: "Leaderboard", icon: Award },
   { href: "/about", label: "About", icon: Info },
 ];
 
@@ -123,7 +125,7 @@ export function SiteHeader() {
         {/* Desktop Nav Links */}
         <nav
           className={cn(
-            "hidden md:flex items-center gap-1 p-1 rounded-full border relative transition-colors",
+            "hidden md:flex items-center gap-0.5 lg:gap-1 p-1 rounded-full border relative transition-colors",
             isDarkHero
               ? "bg-white/10 border-white/15"
               : "bg-navy-50/70 border-navy-100/40"
@@ -140,7 +142,7 @@ export function SiteHeader() {
                 key={link.href}
                 href={link.href}
                 className={cn(
-                  "relative group px-4 py-1.5 rounded-full text-sm font-medium transition-colors select-none",
+                  "relative group px-2.5 lg:px-4 py-1.5 rounded-full text-xs lg:text-sm font-medium transition-colors select-none",
                   isActive
                     ? isDarkHero
                       ? "text-navy-950 font-bold"

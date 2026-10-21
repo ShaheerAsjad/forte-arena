@@ -17,6 +17,16 @@ export default function ResultsIndexPage() {
       badge="Championship Standings"
       title="Festival Results & Champions"
       description="Official standings, award announcements, and verified certificates from completed arenas."
+      action={
+        <Link
+          href="/leaderboard"
+          className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full text-xs font-bold bg-gold-400/20 hover:bg-gold-400/30 text-navy-950 border border-gold-400/40 shadow-2xs transition-colors"
+        >
+          <Trophy className="w-3.5 h-3.5 text-gold-600" />
+          <span>View Overall Leaderboard</span>
+          <ArrowRight className="w-3.5 h-3.5" />
+        </Link>
+      }
     >
       <div className="space-y-8 pb-16">
         <Suspense fallback={<ResultsListSkeleton />}>
