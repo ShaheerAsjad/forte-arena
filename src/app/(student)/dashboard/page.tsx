@@ -13,6 +13,7 @@ import {
   isValidDepartmentCode,
   isValidYearCode,
 } from "@/features/profile/academic.config";
+import { AutoRefresh } from "@/components/shared/AutoRefresh";
 
 async function DashboardContent() {
   const user = await requireUser("/login?next=/dashboard");
@@ -38,6 +39,7 @@ async function DashboardContent() {
 
   return (
     <div className="space-y-8">
+      <AutoRefresh intervalMs={60000} />
       {/* Header */}
       <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-navy-100">
         <div className="flex items-center gap-4">

@@ -6,6 +6,7 @@ import { AppError } from "@/lib/errors";
 import { formatEventFullDate, formatEventTime, formatTime24 } from "@/lib/dates";
 import { getAttendanceClosedNoticeText } from "@/features/attendance/attendance.config";
 import { TeamPassClient } from "./TeamPassClient";
+import { AutoRefresh } from "@/components/shared/AutoRefresh";
 import {
   ArrowLeft,
   Calendar,
@@ -43,12 +44,14 @@ export default async function StudentPassPage({ params }: PageProps) {
   }
 
   const { event, student, isEventAttendanceOpen } = passData;
+  const isEventCompleted = event.status === "COMPLETED";
 
   const eventDateStr = formatEventFullDate(event.startsAt);
   const eventTimeStr = formatEventTime(event.startsAt);
 
   return (
     <div className="min-h-screen px-4 py-6 sm:py-10 bg-navy-50/50 flex flex-col items-center justify-center font-sans">
+      <AutoRefresh intervalMs={15000} enabled={!isEventCompleted} />
       <div className="w-full max-w-md space-y-4">
         {/* Navigation back */}
         <div className="flex items-center justify-between px-1">

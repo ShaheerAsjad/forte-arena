@@ -136,6 +136,27 @@ export function AttendanceConsoleClient({
   }, []);
 
   const lastFetchedEventIdRef = useRef<string>(initialEventId);
+  const isPollingRef = useRef(false);
+
+  // Silent background refresh for multi-organizer live sync (does not trigger full-page loading spinner)
+  const pollEventData = useCallback(async (eventId: string) => {
+    if (!eventId || isPollingRef.current || (typeof document !== "undefined" && document.hidden)) {
+      return;
+    }
+    isPollingRef.current = true;
+    try {
+      const [statsRes, partsRes] = await Promise.all([
+        getEventDetailedStatsAction(eventId),
+        getEventAttendanceParticipantsAction(eventId),
+      ]);
+      if (statsRes.ok) setStats(statsRes.data);
+      if (partsRes.ok) setParticipants(partsRes.data);
+    } catch {
+      // Silent background poll failure ignored
+    } finally {
+      isPollingRef.current = false;
+    }
+  }, []);
 
   // Fetch event data when selectedEventId changes (single fetch path on event switch)
   useEffect(() => {
@@ -147,6 +168,29 @@ export function AttendanceConsoleClient({
       refreshEventData(selectedEventId);
     }
   }, [selectedEventId, refreshEventData]);
+
+  // Light auto-refresh for attendance console every ~10s while tab is visible and on visibilitychange
+  useEffect(() => {
+    if (!selectedEventId) return;
+
+    const intervalId = setInterval(() => {
+      if (typeof document !== "undefined" && !document.hidden) {
+        pollEventData(selectedEventId);
+      }
+    }, 10000);
+
+    const handleVisibilityChange = () => {
+      if (typeof document !== "undefined" && !document.hidden) {
+        pollEventData(selectedEventId);
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      clearInterval(intervalId);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [selectedEventId, pollEventData]);
 
   const handleEventChange = (newEventId: string) => {
     if (!newEventId || newEventId === selectedEventId) return;

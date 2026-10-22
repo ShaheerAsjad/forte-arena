@@ -48,6 +48,7 @@ export default async function AdminAttendancePage({
   return (
     <div className="w-full">
       <AttendanceConsoleClient
+        key={activeEventId}
         events={events}
         initialEventId={activeEventId}
         initialStats={initialStats}

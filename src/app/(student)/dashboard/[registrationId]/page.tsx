@@ -22,6 +22,7 @@ import { getEffectiveStatus } from "@/features/events/events.derived";
 import { FeedbackRepository } from "@/features/feedback/repositories/feedback.repository";
 import { StudentFeedbackCard } from "@/features/feedback/components/StudentFeedbackCard";
 import { formatTime24 } from "@/lib/dates";
+import { AutoRefresh } from "@/components/shared/AutoRefresh";
 
 interface PageProps {
   params: Promise<{ registrationId: string }>;
@@ -109,6 +110,7 @@ async function RegistrationDetailContent({
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">
+      <AutoRefresh intervalMs={15000} enabled={!isEventCompleted} />
       {/* Back */}
       <Link
         href="/dashboard"

@@ -131,6 +131,29 @@ export function ScanConsoleClient({
     };
   }, [selectedEventId]);
 
+  // Light auto-refresh for scan console counts while tab is visible and on visibilitychange
+  useEffect(() => {
+    if (!selectedEventId) return;
+
+    const intervalId = setInterval(() => {
+      if (typeof document !== "undefined" && !document.hidden) {
+        refreshCounts(selectedEventId);
+      }
+    }, 10000);
+
+    const handleVisibilityChange = () => {
+      if (typeof document !== "undefined" && !document.hidden) {
+        refreshCounts(selectedEventId);
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      clearInterval(intervalId);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [selectedEventId, refreshCounts]);
+
   const handleEventChange = (newEventId: string) => {
     if (!newEventId || newEventId === selectedEventId) return;
 
