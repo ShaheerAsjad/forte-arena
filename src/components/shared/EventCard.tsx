@@ -77,7 +77,7 @@ export function EventCard({ event, className }: EventCardProps) {
   const dateParts = getDateParts(item.startsAt);
 
   return (
-    <Link href={`/events/${item.slug}`} className="group block focus:outline-none">
+    <Link href={`/events/${item.slug}`} className="group block focus:outline-none h-full">
       <Card
         hoverable
         className={`h-full flex flex-col overflow-hidden border border-navy-100/80 bg-white transition-all duration-300 hover:-translate-y-1.5 group-hover:border-gold-400/80 group-hover:shadow-[0_16px_36px_-8px_rgba(245,185,1,0.22),0_8px_16px_-6px_rgba(0,15,64,0.06)] ${className ?? ""}`}
@@ -158,14 +158,16 @@ export function EventCard({ event, className }: EventCardProps) {
             </div>
 
             {/* Countdown / Seats Left Row */}
-            <div className="flex items-center justify-between pt-1 text-[11px]">
+            <div className="flex items-center justify-between pt-1 text-[11px] min-h-[28px]">
               {derivedStatus === "Registration Open" || derivedStatus === "Closing Soon" ? (
                 <div className="flex items-center gap-1 text-ink/70">
                   <Clock className="w-3.5 h-3.5 text-gold-600" />
                   <CountdownChip targetDate={item.registrationDeadline} />
                 </div>
               ) : (
-                <span className="text-mist font-medium">Registration Closed</span>
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-navy-100/70 text-mist border border-navy-200/40">
+                  {derivedStatus === "Completed" ? "Event Completed" : "Registration Closed"}
+                </span>
               )}
 
               {remainingSeats !== null && (

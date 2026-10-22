@@ -47,6 +47,13 @@ export async function scanCheckInAction(
       revalidatePath("/admin/attendance");
       revalidatePath("/admin/registrations");
       revalidatePath(`/admin/events/${eventId}/registrations`);
+      revalidatePath("/dashboard");
+      revalidatePath("/dashboard/pass/[registrationId]", "page");
+      revalidatePath("/dashboard/[registrationId]", "page");
+      if (result.registration?.id) {
+        revalidatePath(`/dashboard/pass/${result.registration.id}`);
+        revalidatePath(`/dashboard/${result.registration.id}`);
+      }
     }
 
     return { ok: true, data: result };
@@ -92,6 +99,13 @@ export async function manualCheckInAction(
       revalidatePath("/admin/attendance");
       revalidatePath("/admin/registrations");
       revalidatePath(`/admin/events/${eventId}/registrations`);
+      revalidatePath("/dashboard");
+      revalidatePath("/dashboard/pass/[registrationId]", "page");
+      revalidatePath("/dashboard/[registrationId]", "page");
+      if (result.registration?.id) {
+        revalidatePath(`/dashboard/pass/${result.registration.id}`);
+        revalidatePath(`/dashboard/${result.registration.id}`);
+      }
     }
 
     return { ok: true, data: result };
@@ -156,6 +170,18 @@ export async function undoCheckInAction(
     revalidatePath("/admin/attendance");
     revalidatePath("/admin/registrations");
     revalidatePath(`/admin/events/${updated.eventId}/registrations`);
+    revalidatePath("/dashboard");
+    revalidatePath("/dashboard/pass/[registrationId]", "page");
+    revalidatePath("/dashboard/[registrationId]", "page");
+
+    const regId =
+      "registrationId" in updated && updated.registrationId
+        ? (updated.registrationId as string)
+        : updated.id;
+    if (regId) {
+      revalidatePath(`/dashboard/pass/${regId}`);
+      revalidatePath(`/dashboard/${regId}`);
+    }
 
     return { ok: true, data: { id: updated.id } };
   } catch (err) {

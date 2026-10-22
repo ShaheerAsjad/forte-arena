@@ -358,11 +358,20 @@ export class AttendanceRepository {
       },
       select: {
         id: true,
-        team: { select: { eventId: true } },
+        team: {
+          select: {
+            eventId: true,
+            registrations: { select: { id: true }, take: 1 },
+          },
+        },
       },
     });
 
-    return { id: member.id, eventId: member.team.eventId };
+    return {
+      id: member.id,
+      eventId: member.team.eventId,
+      registrationId: member.team.registrations[0]?.id,
+    };
   }
 
   /**

@@ -350,4 +350,55 @@ describe("Events Filter and Search Logic", () => {
       expect(queryStr).toBe("");
     });
   });
+
+  describe("Status Badge Shared Mapping and Derived Status Guarantees", () => {
+    it("every possible derived status has a non-empty label and visible styling", async () => {
+      const { getStatusMeta } = await import("@/features/events/events.derived");
+      const derivedStatuses = [
+        "Upcoming",
+        "Registration Open",
+        "Closing Soon",
+        "Closed",
+        "Completed",
+      ] as const;
+
+      for (const status of derivedStatuses) {
+        const meta = getStatusMeta(status);
+        expect(meta.label).toBeDefined();
+        expect(meta.label.trim().length).toBeGreaterThan(0);
+        expect(meta.variant).toBeDefined();
+        // Guaranteed not transparent outline
+        if (status === "Closed") {
+          expect(meta.variant).toBe("default");
+          expect(meta.className).toContain("bg-navy-100");
+          expect(meta.className).toContain("text-navy-900");
+        }
+      }
+    });
+
+    it("every possible effective / stored EventStatus has a non-empty label and visible styling", async () => {
+      const { getStatusMeta } = await import("@/features/events/events.derived");
+      const effectiveStatuses = [
+        "DRAFT",
+        "PUBLISHED",
+        "CLOSED",
+        "COMPLETED",
+        "CANCELLED",
+      ] as const;
+
+      for (const status of effectiveStatuses) {
+        const meta = getStatusMeta(status);
+        expect(meta.label).toBeDefined();
+        expect(meta.label.trim().length).toBeGreaterThan(0);
+        expect(meta.variant).toBeDefined();
+      }
+    });
+
+    it("unknown or empty status safely falls back to a non-empty label without throwing", async () => {
+      const { getStatusMeta } = await import("@/features/events/events.derived");
+      expect(getStatusMeta(null).label).toBe("Unknown");
+      expect(getStatusMeta("").label).toBe("Unknown");
+      expect(getStatusMeta("CustomSpecial").label).toBe("CustomSpecial");
+    });
+  });
 });

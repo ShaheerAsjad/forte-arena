@@ -997,6 +997,7 @@ describe("Attendance Unit Tests: Undo Clears Method", () => {
     const clearTeamSpy = vi.spyOn(AttendanceRepository, "clearTeamMemberAttended").mockResolvedValue({
       id: "member-undo-1",
       eventId: "event-1",
+      registrationId: "reg-team-1",
     });
 
     const result = await AttendanceService.undoCheckIn({
@@ -1032,14 +1033,14 @@ describe("Attendance Unit Tests: Undo Clears Method", () => {
   it("clearTeamMemberAttended passes attendanceMethod: null and attendedAt: null in atomic update", async () => {
     const updateSpy = vi.fn().mockResolvedValue({
       id: "member-1",
-      team: { eventId: "event-1" },
+      team: { eventId: "event-1", registrations: [{ id: "reg-team-1" }] },
     });
     mockPrisma.teamMember = {
       count: vi.fn(),
       update: updateSpy,
     };
 
-    await AttendanceRepository.clearTeamMemberAttended("member-1");
+    const res = await AttendanceRepository.clearTeamMemberAttended("member-1");
 
     expect(updateSpy).toHaveBeenCalledWith({
       where: { id: "member-1" },
@@ -1050,9 +1051,288 @@ describe("Attendance Unit Tests: Undo Clears Method", () => {
       },
       select: {
         id: true,
-        team: { select: { eventId: true } },
+        team: {
+          select: {
+            eventId: true,
+            registrations: { select: { id: true }, take: 1 },
+          },
+        },
       },
     });
+    expect(res).toEqual({
+      id: "member-1",
+      eventId: "event-1",
+      registrationId: "reg-team-1",
+    });
+  });
+
+  it("solo lifecycle: check-in -> undo -> all three fields null -> check-in again records new time", async () => {
+    const soloToken = generateCheckInToken();
+    const eventData = {
+      id: "event-lifecycle-1",
+      slug: "ai-contest",
+      title: "AI Contest",
+      status: "PUBLISHED" as const,
+      startsAt: new Date(Date.now() + 86400000),
+      endsAt: null,
+      registrationDeadline: new Date(Date.now() + 86400000),
+      resultsPublished: false,
+    };
+
+    // State container for simulated database row
+    const dbRow: {
+      id: string;
+      checkInToken: string;
+      eventId: string;
+      teamId: null;
+      status: "APPROVED";
+      attendedAt: Date | null;
+      attendedById: string | null;
+      attendanceMethod: "QR" | "MANUAL" | null;
+      event: typeof eventData;
+      user: { name: string; rollNumber: string };
+      team: null;
+    } = {
+      id: "reg-solo-lifecycle-1",
+      checkInToken: soloToken,
+      eventId: "event-lifecycle-1",
+      teamId: null,
+      status: "APPROVED",
+      attendedAt: null,
+      attendedById: null,
+      attendanceMethod: null,
+      event: eventData,
+      user: { name: "Ahmed Raza", rollNumber: "CS-2024" },
+      team: null,
+    };
+
+    // Mock repository to simulate DB mutations
+    vi.spyOn(AttendanceRepository, "findByToken").mockImplementation(async (tok) => {
+      if (tok !== soloToken) return null;
+      return {
+        type: "REGISTRATION",
+        registration: { ...dbRow } as unknown as MockRegistration,
+      };
+    });
+
+    vi.spyOn(AttendanceRepository, "markRegistrationAttended").mockImplementation(
+      async (id, organizerId, attendedAt, method) => {
+        if (dbRow.id === id && dbRow.attendedAt === null && dbRow.status === "APPROVED") {
+          dbRow.attendedAt = attendedAt;
+          dbRow.attendedById = organizerId;
+          dbRow.attendanceMethod = method ?? null;
+          return 1;
+        }
+        return 0;
+      }
+    );
+
+    const updateSpy = vi.fn().mockImplementation(async ({ data }) => {
+      dbRow.attendedAt = data.attendedAt;
+      dbRow.attendedById = data.attendedById;
+      dbRow.attendanceMethod = (data.attendanceMethod as "QR" | "MANUAL" | null) ?? null;
+      return { id: dbRow.id, eventId: dbRow.eventId };
+    });
+    mockPrisma.registration = {
+      groupBy: vi.fn(),
+      count: vi.fn(),
+      update: updateSpy,
+    };
+
+    // STEP 1: Initial check-in
+    const firstCheckIn = await AttendanceService.checkInByToken({
+      token: soloToken,
+      eventId: "event-lifecycle-1",
+      organizerId: "org-1",
+    });
+
+    expect(firstCheckIn.success).toBe(true);
+    expect(firstCheckIn.alreadyCheckedIn).toBe(false);
+    expect(firstCheckIn.attendedAt).toBeInstanceOf(Date);
+    const firstTime = firstCheckIn.attendedAt!;
+    expect(dbRow.attendedAt).toEqual(firstTime);
+    expect(dbRow.attendedById).toBe("org-1");
+    expect(dbRow.attendanceMethod).toBe("QR");
+
+    // Attempting check-in again immediately detects alreadyCheckedIn
+    const immediateRepeat = await AttendanceService.checkInByToken({
+      token: soloToken,
+      eventId: "event-lifecycle-1",
+      organizerId: "org-1",
+    });
+    expect(immediateRepeat.success).toBe(true);
+    expect(immediateRepeat.alreadyCheckedIn).toBe(true);
+    expect(immediateRepeat.attendedAt).toEqual(firstTime);
+
+    // STEP 2: Undo check-in
+    const undoRes = await AttendanceService.undoCheckIn({
+      participantId: "reg-solo-lifecycle-1",
+      participantType: "SOLO",
+    });
+
+    expect(undoRes.id).toBe("reg-solo-lifecycle-1");
+    // Verify ALL THREE fields are strictly null in the database
+    expect(dbRow.attendedAt).toBeNull();
+    expect(dbRow.attendedById).toBeNull();
+    expect(dbRow.attendanceMethod).toBeNull();
+
+    // STEP 3: Check-in again after Undo (must record a NEW time)
+    // Small artificial wait to ensure distinct timestamp
+    await new Promise((r) => setTimeout(r, 10));
+
+    const secondCheckIn = await AttendanceService.checkInByToken({
+      token: soloToken,
+      eventId: "event-lifecycle-1",
+      organizerId: "org-2",
+    });
+
+    expect(secondCheckIn.success).toBe(true);
+    expect(secondCheckIn.alreadyCheckedIn).toBe(false);
+    expect(secondCheckIn.attendedAt).toBeInstanceOf(Date);
+    const secondTime = secondCheckIn.attendedAt!;
+    expect(secondTime.getTime()).toBeGreaterThanOrEqual(firstTime.getTime());
+    expect(dbRow.attendedAt).toEqual(secondTime);
+    expect(dbRow.attendedById).toBe("org-2");
+    expect(dbRow.attendanceMethod).toBe("QR");
+  });
+
+  it("team member lifecycle: check-in -> undo -> all three fields null -> check-in again records new time", async () => {
+    const memberToken = generateCheckInToken();
+    const eventData = {
+      id: "event-team-lifecycle-1",
+      slug: "hackathon",
+      title: "Hackathon",
+      status: "PUBLISHED" as const,
+      startsAt: new Date(Date.now() + 86400000),
+      endsAt: null,
+      registrationDeadline: new Date(Date.now() + 86400000),
+      resultsPublished: false,
+    };
+
+    // State container for simulated database row
+    const dbMemberRow: {
+      id: string;
+      teamId: string;
+      fullName: string;
+      rollNumber: string;
+      checkInToken: string;
+      attendedAt: Date | null;
+      attendedById: string | null;
+      attendanceMethod: "QR" | "MANUAL" | null;
+    } = {
+      id: "member-lifecycle-1",
+      teamId: "team-1",
+      fullName: "Sara Khan",
+      rollNumber: "SE-2024",
+      checkInToken: memberToken,
+      attendedAt: null,
+      attendedById: null,
+      attendanceMethod: null,
+    };
+
+    const teamData = {
+      id: "team-1",
+      eventId: "event-team-lifecycle-1",
+      name: "Cyber Knights",
+      event: eventData,
+      members: [dbMemberRow],
+      registrations: [{ id: "reg-team-1", status: "APPROVED" }],
+    };
+
+    vi.spyOn(AttendanceRepository, "findByToken").mockImplementation(async (tok) => {
+      if (tok !== memberToken) return null;
+      return {
+        type: "TEAM_MEMBER",
+        teamMember: {
+          ...dbMemberRow,
+          team: {
+            ...teamData,
+            members: [dbMemberRow],
+          },
+        } as unknown as MockTeamMember,
+      };
+    });
+
+    vi.spyOn(AttendanceRepository, "markTeamMemberAttended").mockImplementation(
+      async (memberId, organizerId, attendedAt, method) => {
+        if (dbMemberRow.id === memberId && dbMemberRow.attendedAt === null) {
+          dbMemberRow.attendedAt = attendedAt;
+          dbMemberRow.attendedById = organizerId;
+          dbMemberRow.attendanceMethod = method ?? null;
+          return 1;
+        }
+        return 0;
+      }
+    );
+
+    const updateSpy = vi.fn().mockImplementation(async ({ data }) => {
+      dbMemberRow.attendedAt = data.attendedAt;
+      dbMemberRow.attendedById = data.attendedById;
+      dbMemberRow.attendanceMethod = (data.attendanceMethod as "QR" | "MANUAL" | null) ?? null;
+      return {
+        id: dbMemberRow.id,
+        team: { eventId: "event-team-lifecycle-1", registrations: [{ id: "reg-team-1" }] },
+      };
+    });
+    mockPrisma.teamMember = {
+      count: vi.fn(),
+      update: updateSpy,
+    };
+
+    // STEP 1: Initial check-in
+    const firstCheckIn = await AttendanceService.checkInByToken({
+      token: memberToken,
+      eventId: "event-team-lifecycle-1",
+      organizerId: "org-1",
+    });
+
+    expect(firstCheckIn.success).toBe(true);
+    expect(firstCheckIn.alreadyCheckedIn).toBe(false);
+    expect(firstCheckIn.attendedAt).toBeInstanceOf(Date);
+    const firstTime = firstCheckIn.attendedAt!;
+    expect(dbMemberRow.attendedAt).toEqual(firstTime);
+    expect(dbMemberRow.attendedById).toBe("org-1");
+    expect(dbMemberRow.attendanceMethod).toBe("QR");
+
+    // Immediate repeat says alreadyCheckedIn
+    const immediateRepeat = await AttendanceService.checkInByToken({
+      token: memberToken,
+      eventId: "event-team-lifecycle-1",
+      organizerId: "org-1",
+    });
+    expect(immediateRepeat.success).toBe(true);
+    expect(immediateRepeat.alreadyCheckedIn).toBe(true);
+    expect(immediateRepeat.attendedAt).toEqual(firstTime);
+
+    // STEP 2: Undo check-in
+    const undoRes = await AttendanceService.undoCheckIn({
+      participantId: "member-lifecycle-1",
+      participantType: "TEAM_MEMBER",
+    });
+
+    expect(undoRes.id).toBe("member-lifecycle-1");
+    // Verify ALL THREE fields are strictly null in the database
+    expect(dbMemberRow.attendedAt).toBeNull();
+    expect(dbMemberRow.attendedById).toBeNull();
+    expect(dbMemberRow.attendanceMethod).toBeNull();
+
+    // STEP 3: Check-in again after Undo (must record a NEW time)
+    await new Promise((r) => setTimeout(r, 10));
+
+    const secondCheckIn = await AttendanceService.checkInByToken({
+      token: memberToken,
+      eventId: "event-team-lifecycle-1",
+      organizerId: "org-2",
+    });
+
+    expect(secondCheckIn.success).toBe(true);
+    expect(secondCheckIn.alreadyCheckedIn).toBe(false);
+    expect(secondCheckIn.attendedAt).toBeInstanceOf(Date);
+    const secondTime = secondCheckIn.attendedAt!;
+    expect(secondTime.getTime()).toBeGreaterThanOrEqual(firstTime.getTime());
+    expect(dbMemberRow.attendedAt).toEqual(secondTime);
+    expect(dbMemberRow.attendedById).toBe("org-2");
+    expect(dbMemberRow.attendanceMethod).toBe("QR");
   });
 });
 

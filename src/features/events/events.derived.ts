@@ -28,6 +28,108 @@ export type DerivedEventStatus =
   | "Closed"
   | "Completed";
 
+export interface StatusDisplayMeta {
+  label: string;
+  variant:
+    | "default"
+    | "navy"
+    | "gold"
+    | "success"
+    | "warning"
+    | "danger"
+    | "info"
+    | "outline";
+  className?: string;
+}
+
+export const EVENT_STATUS_CONFIG: Record<string, StatusDisplayMeta> = {
+  // Derived event statuses (public card & detail)
+  "REGISTRATION OPEN": {
+    label: "Registration Open",
+    variant: "success",
+    className: "border border-emerald-300/60 font-semibold shadow-2xs",
+  },
+  "CLOSING SOON": {
+    label: "Closing Soon",
+    variant: "warning",
+    className: "border border-amber-300/60 font-semibold shadow-2xs",
+  },
+  "UPCOMING": {
+    label: "Upcoming",
+    variant: "info",
+    className: "border border-sky-300/60 font-semibold shadow-2xs",
+  },
+  "CLOSED": {
+    label: "Closed",
+    variant: "default",
+    className: "bg-navy-100 text-navy-900 border border-navy-200/80 font-semibold shadow-2xs",
+  },
+  "COMPLETED": {
+    label: "Completed",
+    variant: "gold",
+    className: "border border-gold-300/60 font-semibold shadow-2xs",
+  },
+
+  // Lifecycle / DB EventStatus values (admin)
+  "DRAFT": {
+    label: "Draft",
+    variant: "default",
+    className: "bg-navy-100 text-mist border border-navy-200 font-medium shadow-2xs",
+  },
+  "PUBLISHED": {
+    label: "Live / Open",
+    variant: "navy",
+    className: "border border-navy-800 font-semibold shadow-2xs",
+  },
+  "CANCELLED": {
+    label: "Cancelled",
+    variant: "danger",
+    className: "border border-rose-300/60 font-semibold shadow-2xs",
+  },
+
+  // Registration statuses (pass & review)
+  "PENDING": {
+    label: "Pending Review",
+    variant: "warning",
+    className: "border border-amber-300/60 font-semibold shadow-2xs",
+  },
+  "APPROVED": {
+    label: "Approved",
+    variant: "success",
+    className: "border border-emerald-300/60 font-semibold shadow-2xs",
+  },
+  "REJECTED": {
+    label: "Rejected",
+    variant: "danger",
+    className: "border border-rose-300/60 font-semibold shadow-2xs",
+  },
+  "WITHDRAWN": {
+    label: "Withdrawn",
+    variant: "default",
+    className: "bg-navy-100 text-mist border border-navy-200 font-medium shadow-2xs",
+  },
+};
+
+export function getStatusMeta(status: string | null | undefined): StatusDisplayMeta {
+  if (!status || !status.trim()) {
+    return {
+      label: "Unknown",
+      variant: "default",
+      className: "bg-navy-100 text-navy-800 border border-navy-200 font-semibold shadow-2xs",
+    };
+  }
+  const key = status.trim().toUpperCase();
+  const found = EVENT_STATUS_CONFIG[key];
+  if (found) {
+    return found;
+  }
+  return {
+    label: status.trim(),
+    variant: "default",
+    className: "bg-navy-100 text-navy-800 border border-navy-200 font-semibold shadow-2xs",
+  };
+}
+
 export interface EventWithDerivedStatus<T extends EventCardItem = EventCardItem> {
   item: T;
   derivedStatus: DerivedEventStatus;

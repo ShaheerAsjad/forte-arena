@@ -122,7 +122,7 @@ export function StickyRegisterBar({
                 </Link>
               ) : !isRegistrationOpen ? (
                 <Button disabled variant="outline" size="sm" className="whitespace-nowrap border-white/20 text-ivory/60">
-                  Closed
+                  {derivedStatus === "Completed" ? "Event Completed" : "Registration Closed"}
                 </Button>
               ) : remainingSeats === 0 ? (
                 <Button disabled variant="outline" size="sm" className="whitespace-nowrap border-white/20 text-ivory/60">
