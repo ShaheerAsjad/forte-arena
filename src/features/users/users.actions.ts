@@ -6,6 +6,12 @@ import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/session";
 import { AppError } from "@/lib/errors";
 
+import {
+  DEPARTMENT_VALUES,
+  YEAR_VALUES,
+} from "@/features/profile/academic.config";
+import { buildProfileUpdateData } from "./profile.update";
+
 type ActionResult<T = void> =
   | { ok: true; data: T }
   | { ok: false; error: string };
@@ -17,9 +23,19 @@ const profileSchema = z.object({
     .max(30, "Roll number is too long")
     .regex(/^[A-Za-z0-9\-\/]+$/, "Roll number contains invalid characters"),
   department: z
-    .string()
-    .min(2, "Department must be at least 2 characters")
-    .max(100, "Department name is too long"),
+    .enum(DEPARTMENT_VALUES, {
+      message: "Invalid department selection",
+    })
+    .or(z.literal(""))
+    .nullable()
+    .optional(),
+  academicYear: z
+    .enum(YEAR_VALUES, {
+      message: "Invalid academic year selection",
+    })
+    .or(z.literal(""))
+    .nullable()
+    .optional(),
   phone: z
     .string()
     .min(7, "Phone number must be at least 7 digits")
@@ -38,11 +54,12 @@ export async function updateProfile(
       const firstError = parsed.error.issues[0];
       return { ok: false, error: firstError?.message ?? "Invalid input" };
     }
-    const { rollNumber, department, phone } = parsed.data;
+
+    const data = buildProfileUpdateData(parsed.data);
 
     await prisma.user.update({
       where: { id: user.id },
-      data: { rollNumber, department, phone },
+      data,
     });
 
     revalidatePath("/profile");

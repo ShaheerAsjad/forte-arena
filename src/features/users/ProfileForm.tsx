@@ -7,7 +7,22 @@ import { z } from "zod";
 import { toast } from "sonner";
 import { updateProfile } from "@/features/users/users.actions";
 import { Button } from "@/components/ui/Button";
-import { CheckCircle2, User, Phone, BookOpen, AlertCircle } from "lucide-react";
+import {
+  CheckCircle2,
+  User,
+  Phone,
+  BookOpen,
+  GraduationCap,
+  AlertCircle,
+} from "lucide-react";
+import {
+  DEPARTMENTS,
+  YEARS,
+  DEPARTMENT_VALUES,
+  YEAR_VALUES,
+  isValidDepartmentCode,
+  isValidYearCode,
+} from "@/features/profile/academic.config";
 
 const profileSchema = z.object({
   rollNumber: z
@@ -15,10 +30,12 @@ const profileSchema = z.object({
     .min(2, "Roll number must be at least 2 characters")
     .max(30)
     .regex(/^[A-Za-z0-9\-\/]+$/, "Roll number contains invalid characters"),
-  department: z
-    .string()
-    .min(2, "Department must be at least 2 characters")
-    .max(100),
+  department: z.enum(DEPARTMENT_VALUES, {
+    message: "Please choose your department",
+  }),
+  academicYear: z.enum(YEAR_VALUES, {
+    message: "Please choose your academic year",
+  }),
   phone: z
     .string()
     .min(7, "Phone number must be at least 7 digits")
@@ -32,6 +49,7 @@ interface ProfileFormProps {
   initialValues: {
     rollNumber: string | null;
     department: string | null;
+    academicYear: string | null;
     phone: string | null;
     name: string;
     email: string;
@@ -42,6 +60,11 @@ export function ProfileForm({ initialValues }: ProfileFormProps) {
   const [isPending, startTransition] = useTransition();
   const [saved, setSaved] = useState(false);
 
+  const isDepartmentValid =
+    !!initialValues.department && isValidDepartmentCode(initialValues.department);
+  const isYearValid =
+    !!initialValues.academicYear && isValidYearCode(initialValues.academicYear);
+
   const {
     register,
     handleSubmit,
@@ -50,7 +73,12 @@ export function ProfileForm({ initialValues }: ProfileFormProps) {
     resolver: zodResolver(profileSchema),
     defaultValues: {
       rollNumber: initialValues.rollNumber ?? "",
-      department: initialValues.department ?? "",
+      department: (isDepartmentValid
+        ? initialValues.department
+        : "") as (typeof DEPARTMENT_VALUES)[number],
+      academicYear: (isYearValid
+        ? initialValues.academicYear
+        : "") as (typeof YEAR_VALUES)[number],
       phone: initialValues.phone ?? "",
     },
   });
@@ -70,7 +98,8 @@ export function ProfileForm({ initialValues }: ProfileFormProps) {
 
   const isComplete =
     !!initialValues.rollNumber &&
-    !!initialValues.department &&
+    isDepartmentValid &&
+    isYearValid &&
     !!initialValues.phone;
 
   return (
@@ -133,14 +162,46 @@ export function ProfileForm({ initialValues }: ProfileFormProps) {
           <BookOpen className="w-4 h-4 text-gold-600" />
           Department <span className="text-danger">*</span>
         </label>
-        <input
+        <select
           id="department"
           {...register("department")}
-          placeholder="e.g. Computer Science"
           className="w-full px-4 py-2.5 rounded-xl border border-navy-200 bg-white text-navy-950 placeholder:text-mist/60 focus:outline-none focus:ring-2 focus:ring-gold-400 focus:border-gold-400 transition text-sm"
-        />
+        >
+          <option value="">Please choose your department</option>
+          {DEPARTMENTS.map((d) => (
+            <option key={d.value} value={d.value}>
+              {d.label}
+            </option>
+          ))}
+        </select>
         {errors.department && (
           <p className="text-xs text-danger">{errors.department.message}</p>
+        )}
+      </div>
+
+      {/* Academic Year */}
+      <div className="space-y-1.5">
+        <label
+          htmlFor="academicYear"
+          className="flex items-center gap-2 text-sm font-semibold text-navy-950"
+        >
+          <GraduationCap className="w-4 h-4 text-gold-600" />
+          Academic Year <span className="text-danger">*</span>
+        </label>
+        <select
+          id="academicYear"
+          {...register("academicYear")}
+          className="w-full px-4 py-2.5 rounded-xl border border-navy-200 bg-white text-navy-950 placeholder:text-mist/60 focus:outline-none focus:ring-2 focus:ring-gold-400 focus:border-gold-400 transition text-sm"
+        >
+          <option value="">Please choose your academic year</option>
+          {YEARS.map((y) => (
+            <option key={y.value} value={y.value}>
+              {y.label}
+            </option>
+          ))}
+        </select>
+        {errors.academicYear && (
+          <p className="text-xs text-danger">{errors.academicYear.message}</p>
         )}
       </div>
 

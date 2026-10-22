@@ -1,24 +1,40 @@
 import { Suspense } from "react";
 import Link from "next/link";
 import { requireUser } from "@/lib/session";
+import { prisma } from "@/lib/prisma";
 import { RegistrationsRepository } from "@/features/registrations/repositories/registrations.repository";
 import { DashboardTabs } from "@/features/registrations/DashboardTabs";
 import { SignOutButton } from "./SignOutButton";
 import { Logo } from "@/components/shared/Logo";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
-import { Trophy, UserCircle, Home } from "lucide-react";
+import { Trophy, UserCircle, Home, AlertCircle } from "lucide-react";
+import {
+  isValidDepartmentCode,
+  isValidYearCode,
+} from "@/features/profile/academic.config";
 
 async function DashboardContent() {
   const user = await requireUser("/login?next=/dashboard");
 
-  const registrations = await RegistrationsRepository.getUserRegistrations(
-    user.id
-  );
+  const [registrations, dbUser] = await Promise.all([
+    RegistrationsRepository.getUserRegistrations(user.id),
+    prisma.user.findUnique({
+      where: { id: user.id },
+      select: { department: true, academicYear: true },
+    }),
+  ]);
 
   const approvedCount = registrations.filter(
     (r) => r.status === "APPROVED"
   ).length;
+
+  const departmentMissingOrInvalid =
+    !dbUser?.department || !isValidDepartmentCode(dbUser.department);
+  const yearMissingOrInvalid =
+    !dbUser?.academicYear || !isValidYearCode(dbUser.academicYear);
+  const needsProfileCompletion =
+    departmentMissingOrInvalid || yearMissingOrInvalid;
 
   return (
     <div className="space-y-8">
@@ -55,6 +71,32 @@ async function DashboardContent() {
           <SignOutButton />
         </div>
       </header>
+
+      {/* Profile Completion Banner */}
+      {needsProfileCompletion && (
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 shadow-sm">
+          <div className="flex items-center gap-3">
+            <AlertCircle className="w-5 h-5 text-amber-600 shrink-0" />
+            <div>
+              <p className="text-sm font-semibold text-amber-950">
+                Complete your profile (Department and Year)
+              </p>
+              <p className="text-xs text-amber-800 mt-0.5">
+                Please add your department and year so your results count on the leaderboard.
+              </p>
+            </div>
+          </div>
+          <Link href="/profile" className="shrink-0 self-start sm:self-center">
+            <Button
+              variant="outline"
+              size="sm"
+              className="border-amber-300 text-amber-950 hover:bg-amber-100 bg-white"
+            >
+              Edit Profile
+            </Button>
+          </Link>
+        </div>
+      )}
 
       {/* Stats Strip */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">

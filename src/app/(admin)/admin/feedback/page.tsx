@@ -12,6 +12,7 @@ import {
   Calendar,
   Sparkles,
 } from "lucide-react";
+import { getDepartmentLabel } from "@/features/profile/academic.config";
 
 export const metadata = {
   title: "Participant Feedback | Admin Console",
@@ -236,7 +237,7 @@ async function AdminFeedbackContent({ searchParams }: PageProps) {
                       )}
                       {item.user.department && (
                         <span className="text-[11px] text-mist hidden sm:inline">
-                          • {item.user.department}
+                          • {getDepartmentLabel(item.user.department) ?? item.user.department}
                         </span>
                       )}
                     </div>

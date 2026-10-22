@@ -18,6 +18,7 @@ async function ProfileContent() {
         email: true,
         rollNumber: true,
         department: true,
+        academicYear: true,
         phone: true,
       },
     }),
@@ -72,6 +73,7 @@ async function ProfileContent() {
             email: dbUser?.email ?? user.email ?? "",
             rollNumber: dbUser?.rollNumber ?? null,
             department: dbUser?.department ?? null,
+            academicYear: dbUser?.academicYear ?? null,
             phone: dbUser?.phone ?? null,
           }}
         />

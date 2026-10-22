@@ -2,8 +2,14 @@ import { describe, it, expect, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
 vi.mock("next/server", () => ({ connection: async () => {} }));
-vi.mock("@/lib/prisma", () => ({ prisma: {} }));
+vi.mock("@/lib/prisma", () => ({
+  prisma: {
+    result: { findMany: vi.fn() },
+    user: { findMany: vi.fn() },
+  },
+}));
 
+import { prisma } from "@/lib/prisma";
 import {
   LEADERBOARD_POINTS,
   getScoringLegendText,
@@ -23,7 +29,23 @@ import {
   getPodiumEntries,
   getPodiumAccent,
 } from "@/features/leaderboard/leaderboard.podium";
-import type { RawLeaderboardResultItem } from "@/features/leaderboard/repositories/leaderboard.repository";
+import {
+  LeaderboardRepository,
+  type RawLeaderboardResultItem,
+} from "@/features/leaderboard/repositories/leaderboard.repository";
+import {
+  DEPARTMENTS,
+  YEARS,
+  isValidDepartment,
+  isValidDepartmentCode,
+  isValidYear,
+  isValidYearCode,
+  getDepartmentLabel,
+  getYearLabel,
+  resolveDepartmentLabel,
+  sanitizeAcademicFields,
+} from "@/features/profile/academic.config";
+import { buildProfileUpdateData } from "@/features/users/profile.update";
 
 describe("Leaderboard Config & Legend", () => {
   it("provides correct point values from LEADERBOARD_POINTS", () => {
@@ -483,3 +505,392 @@ describe("Leaderboard Podium Entries & Accents", () => {
     expect(getPodiumAccent(podium[2].rank)).toBe("silver");
   });
 });
+
+describe("Academic Config - DEPARTMENTS & YEARS", () => {
+  it("defines canonical DEPARTMENTS with exact codes and labels", () => {
+    expect(DEPARTMENTS).toEqual([
+      { value: "ICS", label: "ICS" },
+      { value: "FSC_PRE_ENGINEERING", label: "FSc Pre-Engineering" },
+      { value: "FSC_PRE_MEDICAL", label: "FSc Pre-Medical" },
+      { value: "ARTS", label: "Arts" },
+    ]);
+  });
+
+  it("defines canonical YEARS with exact codes and labels", () => {
+    expect(YEARS).toEqual([
+      { value: "FIRST_YEAR", label: "First Year" },
+      { value: "SECOND_YEAR", label: "Second Year" },
+    ]);
+  });
+
+  it("validates departments and rejects old free-text or university codes", () => {
+    expect(isValidDepartment("ICS")).toBe(true);
+    expect(isValidDepartment("FSC_PRE_ENGINEERING")).toBe(true);
+    expect(isValidDepartment("FSC_PRE_MEDICAL")).toBe(true);
+    expect(isValidDepartment("ARTS")).toBe(true);
+    expect(isValidDepartment("FSc Pre-Engineering")).toBe(true);
+
+    // Rejects old free-text, university codes, null, empty
+    expect(isValidDepartment("Computer Science")).toBe(false);
+    expect(isValidDepartment("fsc pre medical")).toBe(false);
+    expect(isValidDepartment("CS")).toBe(false);
+    expect(isValidDepartment("SE")).toBe(false);
+    expect(isValidDepartment("EE")).toBe(false);
+    expect(isValidDepartment("BBA")).toBe(false);
+    expect(isValidDepartment(null)).toBe(false);
+    expect(isValidDepartment(undefined)).toBe(false);
+    expect(isValidDepartment("")).toBe(false);
+
+    // Exact code validation (rejects labels, free text, null)
+    expect(isValidDepartmentCode("ICS")).toBe(true);
+    expect(isValidDepartmentCode("FSC_PRE_MEDICAL")).toBe(true);
+    expect(isValidDepartmentCode("FSc Pre-Medical")).toBe(false);
+    expect(isValidDepartmentCode("Computer Science")).toBe(false);
+    expect(isValidDepartmentCode(null)).toBe(false);
+  });
+
+  it("validates academic years and rejects invalid codes or text", () => {
+    expect(isValidYear("FIRST_YEAR")).toBe(true);
+    expect(isValidYear("SECOND_YEAR")).toBe(true);
+    expect(isValidYear("First Year")).toBe(true);
+    expect(isValidYear("Second Year")).toBe(true);
+
+    expect(isValidYear("THIRD_YEAR")).toBe(false);
+    expect(isValidYear("Freshman")).toBe(false);
+    expect(isValidYear("")).toBe(false);
+    expect(isValidYear(null)).toBe(false);
+    expect(isValidYear(undefined)).toBe(false);
+
+    // Exact year code validation (rejects labels, free text, null)
+    expect(isValidYearCode("FIRST_YEAR")).toBe(true);
+    expect(isValidYearCode("SECOND_YEAR")).toBe(true);
+    expect(isValidYearCode("First Year")).toBe(false);
+    expect(isValidYearCode("Freshman")).toBe(false);
+    expect(isValidYearCode(null)).toBe(false);
+  });
+
+  it("converts department codes to canonical labels and returns null for unknown", () => {
+    expect(getDepartmentLabel("ICS")).toBe("ICS");
+    expect(getDepartmentLabel("FSC_PRE_ENGINEERING")).toBe("FSc Pre-Engineering");
+    expect(getDepartmentLabel("FSC_PRE_MEDICAL")).toBe("FSc Pre-Medical");
+    expect(getDepartmentLabel("ARTS")).toBe("Arts");
+
+    // Unknown or invalid codes return null
+    expect(getDepartmentLabel("Computer Science")).toBeNull();
+    expect(getDepartmentLabel("unknown")).toBeNull();
+    expect(getDepartmentLabel(null)).toBeNull();
+  });
+
+  it("converts year codes to canonical labels and returns null for unknown", () => {
+    expect(getYearLabel("FIRST_YEAR")).toBe("First Year");
+    expect(getYearLabel("SECOND_YEAR")).toBe("Second Year");
+
+    // Unknown or invalid codes return null
+    expect(getYearLabel("THIRD_YEAR")).toBeNull();
+    expect(getYearLabel("First Year")).toBeNull();
+    expect(getYearLabel(null)).toBeNull();
+  });
+
+  it("resolves valid departments to display labels and returns null for invalid", () => {
+    expect(resolveDepartmentLabel("ICS")).toBe("ICS");
+    expect(resolveDepartmentLabel("FSC_PRE_ENGINEERING")).toBe("FSc Pre-Engineering");
+    expect(resolveDepartmentLabel("FSC_PRE_MEDICAL")).toBe("FSc Pre-Medical");
+    expect(resolveDepartmentLabel("ARTS")).toBe("Arts");
+    expect(resolveDepartmentLabel("FSc Pre-Engineering")).toBe("FSc Pre-Engineering");
+
+    // Invalid / old free-text
+    expect(resolveDepartmentLabel("Computer Science")).toBeNull();
+    expect(resolveDepartmentLabel("fsc pre medical")).toBeNull();
+    expect(resolveDepartmentLabel("Mechanical Engineering")).toBeNull();
+    expect(resolveDepartmentLabel("CS")).toBeNull();
+    expect(resolveDepartmentLabel(null)).toBeNull();
+  });
+
+  it("sanitizes academic fields keeping only valid codes", () => {
+    // Valid codes kept as-is
+    expect(
+      sanitizeAcademicFields({
+        department: "ICS",
+        academicYear: "FIRST_YEAR",
+      })
+    ).toEqual({
+      department: "ICS",
+      academicYear: "FIRST_YEAR",
+    });
+
+    // Old free text, labels, or university codes mapped to null
+    expect(
+      sanitizeAcademicFields({
+        department: "Computer Science",
+        academicYear: "Freshman",
+      })
+    ).toEqual({
+      department: null,
+      academicYear: null,
+    });
+
+    // Display labels (not codes) mapped to null
+    expect(
+      sanitizeAcademicFields({
+        department: "FSc Pre-Medical",
+        academicYear: "First Year",
+      })
+    ).toEqual({
+      department: null,
+      academicYear: null,
+    });
+
+    // Empty or missing inputs
+    expect(sanitizeAcademicFields({})).toEqual({
+      department: null,
+      academicYear: null,
+    });
+    expect(sanitizeAcademicFields(null)).toEqual({
+      department: null,
+      academicYear: null,
+    });
+  });
+});
+
+describe("Profile Update Data Builder", () => {
+  it("includes department and academicYear when valid codes are provided", () => {
+    const updateData = buildProfileUpdateData({
+      rollNumber: "2021-CS-001",
+      phone: "+92 300 1234567",
+      department: "ICS",
+      academicYear: "FIRST_YEAR",
+    });
+
+    expect(updateData).toEqual({
+      rollNumber: "2021-CS-001",
+      phone: "+92 300 1234567",
+      department: "ICS",
+      academicYear: "FIRST_YEAR",
+    });
+  });
+
+  it("does not include department or academicYear in update data when undefined (leaves stored values untouched)", () => {
+    const updateData = buildProfileUpdateData({
+      rollNumber: "2021-CS-001",
+      phone: "+92 300 1234567",
+      department: undefined,
+      academicYear: undefined,
+    });
+
+    expect(updateData).toEqual({
+      rollNumber: "2021-CS-001",
+      phone: "+92 300 1234567",
+    });
+    expect("department" in updateData).toBe(false);
+    expect("academicYear" in updateData).toBe(false);
+  });
+
+  it("sets department and academicYear to null when explicitly passed empty string or null (clears them)", () => {
+    const updateDataWithEmpty = buildProfileUpdateData({
+      rollNumber: "2021-CS-001",
+      phone: "+92 300 1234567",
+      department: "",
+      academicYear: "",
+    });
+
+    expect(updateDataWithEmpty).toEqual({
+      rollNumber: "2021-CS-001",
+      phone: "+92 300 1234567",
+      department: null,
+      academicYear: null,
+    });
+
+    const updateDataWithNull = buildProfileUpdateData({
+      rollNumber: "2021-CS-001",
+      phone: "+92 300 1234567",
+      department: null,
+      academicYear: null,
+    });
+
+    expect(updateDataWithNull).toEqual({
+      rollNumber: "2021-CS-001",
+      phone: "+92 300 1234567",
+      department: null,
+      academicYear: null,
+    });
+  });
+});
+
+describe("Leaderboard Repository Department Sanitization", () => {
+  it("treats stored departments not in DEPARTMENTS as unspecified (null) in repository output", async () => {
+    const mockPrisma = prisma as unknown as {
+      result: { findMany: ReturnType<typeof vi.fn> };
+      user: { findMany: ReturnType<typeof vi.fn> };
+    };
+
+    mockPrisma.result.findMany.mockResolvedValueOnce([
+      // 1. User with old free-text "Computer Science"
+      {
+        id: "res-1",
+        position: 1,
+        award: "Champion",
+        customParticipantName: null,
+        event: {
+          id: "ev-1",
+          slug: "event-1",
+          title: "Code Sprint",
+          category: "TECHNICAL",
+          startsAt: new Date("2026-10-10"),
+          resultsPublished: true,
+        },
+        registration: {
+          id: "reg-1",
+          user: {
+            id: "u-1",
+            name: "Ali Khan",
+            rollNumber: "CS-101",
+            department: "Computer Science", // Old free-text
+          },
+          team: null,
+        },
+      },
+      // 2. User with old free-text "fsc pre medical"
+      {
+        id: "res-2",
+        position: 2,
+        award: "Runner-Up",
+        customParticipantName: null,
+        event: {
+          id: "ev-1",
+          slug: "event-1",
+          title: "Code Sprint",
+          category: "TECHNICAL",
+          startsAt: new Date("2026-10-10"),
+          resultsPublished: true,
+        },
+        registration: {
+          id: "reg-2",
+          user: {
+            id: "u-2",
+            name: "Sara Ahmed",
+            rollNumber: "MED-202",
+            department: "fsc pre medical", // Old free-text
+          },
+          team: null,
+        },
+      },
+      // 3. User with valid department "FSC_PRE_ENGINEERING"
+      {
+        id: "res-3",
+        position: 3,
+        award: "Third Place",
+        customParticipantName: null,
+        event: {
+          id: "ev-1",
+          slug: "event-1",
+          title: "Code Sprint",
+          category: "TECHNICAL",
+          startsAt: new Date("2026-10-10"),
+          resultsPublished: true,
+        },
+        registration: {
+          id: "reg-3",
+          user: {
+            id: "u-3",
+            name: "Bilal Tariq",
+            rollNumber: "ENG-303",
+            department: "FSC_PRE_ENGINEERING", // Valid code
+          },
+          team: null,
+        },
+      },
+      // 4. Team with leader having valid "ICS" and member with old free-text "Mechanical Engineering"
+      {
+        id: "res-4",
+        position: 1,
+        award: "Champion",
+        customParticipantName: null,
+        event: {
+          id: "ev-2",
+          slug: "event-2",
+          title: "Robo Wars",
+          category: "TECHNICAL",
+          startsAt: new Date("2026-10-11"),
+          resultsPublished: true,
+        },
+        registration: {
+          id: "reg-4",
+          user: {
+            id: "u-lead",
+            name: "Team Lead",
+            rollNumber: "ICS-001",
+            department: "ICS",
+          },
+          team: {
+            id: "team-1",
+            name: "RoboStars",
+            leader: {
+              id: "u-lead",
+              name: "Team Lead",
+              rollNumber: "ICS-001",
+              department: "ICS", // Valid code
+            },
+            members: [
+              {
+                id: "tm-lead",
+                fullName: "Team Lead",
+                rollNumber: "ICS-001",
+                email: "lead@test.com",
+              },
+              {
+                id: "tm-1",
+                fullName: "Member One",
+                rollNumber: "OLD-999",
+                email: "member1@test.com",
+              },
+            ],
+          },
+        },
+      },
+    ]);
+
+    mockPrisma.user.findMany.mockResolvedValueOnce([
+      {
+        id: "u-lead",
+        name: "Team Lead",
+        rollNumber: "ICS-001",
+        email: "lead@test.com",
+        department: "ICS", // Valid code
+      },
+      {
+        id: "u-mem",
+        name: "Member One",
+        rollNumber: "OLD-999",
+        email: "member1@test.com",
+        department: "Mechanical Engineering", // Old free-text
+      },
+    ]);
+
+    const results = await LeaderboardRepository.getPublishedResults();
+
+    expect(results).toHaveLength(4);
+
+    // Old free-text "Computer Science" -> department is null
+    expect(results[0].participants[0].department).toBeNull();
+    expect(results[0].participants[0].name).toBe("Ali Khan");
+
+    // Old free-text "fsc pre medical" -> department is null
+    expect(results[1].participants[0].department).toBeNull();
+    expect(results[1].participants[0].name).toBe("Sara Ahmed");
+
+    // Valid "FSC_PRE_ENGINEERING" -> department is "FSc Pre-Engineering"
+    expect(results[2].participants[0].department).toBe("FSc Pre-Engineering");
+    expect(results[2].participants[0].name).toBe("Bilal Tariq");
+
+    // Find participants by name and assert BOTH team leader (valid "ICS" -> "ICS") and member with old free-text (-> null)
+    const teamLeader = results[3].participants.find((p) => p.name === "Team Lead");
+    const teamMember = results[3].participants.find((p) => p.name === "Member One");
+
+    expect(teamLeader).toBeDefined();
+    expect(teamLeader?.department).toBe("ICS");
+
+    expect(teamMember).toBeDefined();
+    expect(teamMember?.department).toBeNull();
+  });
+});
+

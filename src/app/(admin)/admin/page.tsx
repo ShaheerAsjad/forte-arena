@@ -19,6 +19,7 @@ import {
   XCircle,
   Star,
 } from "lucide-react";
+import { getDepartmentLabel } from "@/features/profile/academic.config";
 
 const REG_STATUS_BADGES: Record<
   string,
@@ -252,7 +253,7 @@ async function AdminOverviewContent() {
                             <span className="font-mono">{reg.user.rollNumber}</span>
                           )}
                           {reg.user.department && (
-                            <span>• {reg.user.department}</span>
+                            <span>• {getDepartmentLabel(reg.user.department) ?? reg.user.department}</span>
                           )}
                           {reg.team?.members && (
                             <span>• {reg.team.members.length} members</span>

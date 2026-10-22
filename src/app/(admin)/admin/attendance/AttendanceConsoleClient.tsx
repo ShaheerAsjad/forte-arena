@@ -39,6 +39,7 @@ import {
   AlertCircle,
   FileText,
 } from "lucide-react";
+import { getDepartmentLabel } from "@/features/profile/academic.config";
 
 interface EventOption {
   id: string;
@@ -633,7 +634,7 @@ export function AttendanceConsoleClient({
                             </span>
                           ) : (
                             <span className="text-[11px] text-navy-700">
-                              {p.department || "Individual"}
+                              {getDepartmentLabel(p.department) ?? p.department ?? "Individual"}
                             </span>
                           )}
                         </td>
@@ -732,7 +733,9 @@ export function AttendanceConsoleClient({
                               [{p.rollNumber}]
                             </span>
                           )}
-                          {p.department && <span>{p.department}</span>}
+                          {p.department && (
+                            <span>{getDepartmentLabel(p.department) ?? p.department}</span>
+                          )}
                         </p>
                       </div>
 

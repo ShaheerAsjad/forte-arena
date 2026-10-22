@@ -3,6 +3,7 @@ import { prismaAdapter } from "better-auth/adapters/prisma";
 import { nextCookies } from "better-auth/next-js";
 import { prisma } from "@/lib/prisma";
 import { env } from "@/config/env";
+import { sanitizeAcademicFields } from "@/features/profile/academic.config";
 
 const resolvedBaseURL =
   process.env.BETTER_AUTH_URL ||
@@ -53,6 +54,16 @@ export const auth = betterAuth({
         defaultValue: "STUDENT",
         input: false,
       },
+      department: {
+        type: "string",
+        required: false,
+        input: true,
+      },
+      academicYear: {
+        type: "string",
+        required: false,
+        input: true,
+      },
     },
   },
   databaseHooks: {
@@ -68,10 +79,17 @@ export const auth = betterAuth({
           const email = (user.email || "").trim().toLowerCase();
           const isOrganizer = organizerEmails.includes(email);
 
+          const { department, academicYear } = sanitizeAcademicFields({
+            department: (user as Record<string, unknown>).department,
+            academicYear: (user as Record<string, unknown>).academicYear,
+          });
+
           return {
             data: {
               ...user,
               role: isOrganizer ? "ORGANIZER" : "STUDENT",
+              department,
+              academicYear,
             },
           };
         },

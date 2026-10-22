@@ -1,6 +1,7 @@
 import { formatTime24 } from "@/lib/dates";
 import { buildCsv } from "@/features/admin/admin.utils";
 import type { AttendanceParticipantItem } from "./repositories/attendance.repository";
+import { getDepartmentLabel } from "@/features/profile/academic.config";
 
 export const ATTENDANCE_CSV_HEADERS = [
   "Name",
@@ -32,7 +33,7 @@ export function buildAttendanceCsvRows(
     return [
       p.name,
       p.rollNumber || "",
-      p.department || "",
+      getDepartmentLabel(p.department) ?? p.department ?? "",
       p.teamName || "",
       present,
       timeStr,

@@ -31,6 +31,7 @@ import {
   Calendar,
   RotateCcw,
 } from "lucide-react";
+import { getDepartmentLabel } from "@/features/profile/academic.config";
 
 export interface RegistrationReviewItem {
   id: string;
@@ -580,7 +581,7 @@ export function RegistrationsReviewCards({
                               </span>
                             )}
                             {reg.user.department && (
-                              <span>• {reg.user.department}</span>
+                              <span>• {getDepartmentLabel(reg.user.department) ?? reg.user.department}</span>
                             )}
                           </>
                         )}

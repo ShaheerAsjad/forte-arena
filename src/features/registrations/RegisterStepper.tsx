@@ -21,6 +21,7 @@ import {
   LayoutDashboard,
   Clock,
 } from "lucide-react";
+import { getDepartmentLabel } from "@/features/profile/academic.config";
 
 // ────────────────────────────────────────────────────────────────
 // Types & Schemas
@@ -288,7 +289,7 @@ export function RegisterStepper({
               { label: "Name", value: profile.name },
               { label: "Email", value: profile.email },
               { label: "Roll Number", value: profile.rollNumber },
-              { label: "Department", value: profile.department },
+              { label: "Department", value: getDepartmentLabel(profile.department) ?? profile.department },
               { label: "Phone", value: profile.phone },
             ].map(({ label, value }) => (
               <div

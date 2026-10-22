@@ -1,6 +1,7 @@
 import { connection } from "next/server";
 import { prisma } from "@/lib/prisma";
 import type { EventCategory, EventStatus, ParticipationType } from "@/lib/db-types";
+import { getDepartmentLabel } from "@/features/profile/academic.config";
 
 export type PublishedResultEvent = {
   id: string;
@@ -189,7 +190,7 @@ export class ResultsRepository {
       isTie: r.isTie,
       winnerName: r.registration?.user?.name ?? r.customParticipantName ?? "Competitor",
       teamName: r.registration?.team?.name ?? null,
-      department: r.registration?.user?.department ?? null,
+      department: getDepartmentLabel(r.registration?.user?.department) ?? r.registration?.user?.department ?? null,
     }));
 
     return {
@@ -439,7 +440,7 @@ export class ResultsRepository {
       userId: reg.userId,
       userName: reg.user.name,
       rollNumber: reg.user.rollNumber,
-      department: reg.user.department,
+      department: getDepartmentLabel(reg.user.department) ?? reg.user.department,
       teamId: reg.team?.id ?? null,
       teamName: reg.team?.name ?? null,
     }));
@@ -521,7 +522,7 @@ export class ResultsRepository {
       isTie: result.isTie,
       participantName,
       teamName: result.registration?.team?.name ?? null,
-      department: result.registration?.user?.department ?? null,
+      department: getDepartmentLabel(result.registration?.user?.department) ?? result.registration?.user?.department ?? null,
       rollNumber: result.registration?.user?.rollNumber ?? null,
       event: result.event,
     };

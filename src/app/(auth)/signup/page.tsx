@@ -10,11 +10,23 @@ import { toast } from "sonner";
 import { signUp } from "@/lib/auth-client";
 import { APP_NAME } from "@/config/app";
 import { PasswordInput } from "@/components/ui/PasswordInput";
+import {
+  DEPARTMENTS,
+  YEARS,
+  DEPARTMENT_VALUES,
+  YEAR_VALUES,
+} from "@/features/profile/academic.config";
 
 const signupSchema = z
   .object({
     name: z.string().min(2, "Name must be at least 2 characters"),
     email: z.string().email("Please enter a valid email address"),
+    department: z.enum(DEPARTMENT_VALUES, {
+      message: "Please select your department",
+    }),
+    academicYear: z.enum(YEAR_VALUES, {
+      message: "Please select your academic year",
+    }),
     password: z.string().min(6, "Password must be at least 6 characters"),
     confirmPassword: z.string().min(6, "Confirm password is required"),
   })
@@ -40,6 +52,8 @@ function SignupForm() {
     defaultValues: {
       name: "",
       email: "",
+      department: "" as unknown as (typeof DEPARTMENT_VALUES)[number],
+      academicYear: "" as unknown as (typeof YEAR_VALUES)[number],
       password: "",
       confirmPassword: "",
     },
@@ -52,6 +66,11 @@ function SignupForm() {
         name: data.name,
         email: data.email,
         password: data.password,
+        department: data.department,
+        academicYear: data.academicYear,
+      } as Parameters<typeof signUp.email>[0] & {
+        department?: string;
+        academicYear?: string;
       });
 
       if (result.error) {
@@ -121,6 +140,60 @@ function SignupForm() {
           />
           {errors.email && (
             <p className="mt-1 text-xs text-red-500">{errors.email.message}</p>
+          )}
+        </div>
+
+        <div>
+          <label
+            htmlFor="department"
+            className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1"
+          >
+            Department
+          </label>
+          <select
+            id="department"
+            disabled={loading}
+            {...register("department")}
+            className="w-full px-3.5 py-2.5 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+          >
+            <option value="">Please select your department</option>
+            {DEPARTMENTS.map((d) => (
+              <option key={d.value} value={d.value}>
+                {d.label}
+              </option>
+            ))}
+          </select>
+          {errors.department && (
+            <p className="mt-1 text-xs text-red-500">
+              {errors.department.message}
+            </p>
+          )}
+        </div>
+
+        <div>
+          <label
+            htmlFor="academicYear"
+            className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1"
+          >
+            Academic Year
+          </label>
+          <select
+            id="academicYear"
+            disabled={loading}
+            {...register("academicYear")}
+            className="w-full px-3.5 py-2.5 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+          >
+            <option value="">Please select your academic year</option>
+            {YEARS.map((y) => (
+              <option key={y.value} value={y.value}>
+                {y.label}
+              </option>
+            ))}
+          </select>
+          {errors.academicYear && (
+            <p className="mt-1 text-xs text-red-500">
+              {errors.academicYear.message}
+            </p>
           )}
         </div>
 

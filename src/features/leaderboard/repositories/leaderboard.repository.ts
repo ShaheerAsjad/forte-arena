@@ -1,6 +1,7 @@
 import { connection } from "next/server";
 import { prisma } from "@/lib/prisma";
 import type { EventCategory } from "@/lib/db-types";
+import { resolveDepartmentLabel } from "@/features/profile/academic.config";
 
 export interface RawLeaderboardParticipant {
   userId?: string | null;
@@ -161,18 +162,19 @@ export class LeaderboardRepository {
     const userByEmail = new Map<string, { id: string; name: string; department: string | null }>();
 
     for (const u of matchedUsers) {
+      const sanitizedDept = resolveDepartmentLabel(u.department);
       if (u.rollNumber) {
         userByRoll.set(u.rollNumber.trim().toUpperCase(), {
           id: u.id,
           name: u.name,
-          department: u.department,
+          department: sanitizedDept,
         });
       }
       if (u.email) {
         userByEmail.set(u.email.trim().toLowerCase(), {
           id: u.id,
           name: u.name,
-          department: u.department,
+          department: sanitizedDept,
         });
       }
     }
@@ -207,7 +209,7 @@ export class LeaderboardRepository {
             userId: team.leader.id,
             name: team.leader.name,
             rollNumber: team.leader.rollNumber,
-            department: team.leader.department,
+            department: resolveDepartmentLabel(team.leader.department),
           });
         }
       } else if (r.registration?.user) {
@@ -215,7 +217,7 @@ export class LeaderboardRepository {
           userId: r.registration.user.id,
           name: r.registration.user.name,
           rollNumber: r.registration.user.rollNumber,
-          department: r.registration.user.department,
+          department: resolveDepartmentLabel(r.registration.user.department),
         });
       } else if (r.customParticipantName) {
         participants.push({
