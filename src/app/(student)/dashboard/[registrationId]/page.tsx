@@ -23,6 +23,8 @@ import { FeedbackRepository } from "@/features/feedback/repositories/feedback.re
 import { StudentFeedbackCard } from "@/features/feedback/components/StudentFeedbackCard";
 import { formatTime24 } from "@/lib/dates";
 import { AutoRefresh } from "@/components/shared/AutoRefresh";
+import { AddToCalendarButton } from "@/components/shared/AddToCalendarButton";
+import { isCalendarEligible } from "@/features/events/events.calendar";
 
 interface PageProps {
   params: Promise<{ registrationId: string }>;
@@ -184,6 +186,16 @@ async function RegistrationDetailContent({
               <QrCode className="w-4 h-4" />
               <span>Show QR Pass</span>
             </Link>
+          </div>
+        )}
+
+        {/* Add to Calendar for Approved & Calendar-Eligible Registrations */}
+        {registration.status === "APPROVED" && isCalendarEligible(registration.event) && (
+          <div className="p-4 rounded-2xl bg-white border border-navy-100 shadow-2xs space-y-2">
+            <p className="text-[11px] font-bold uppercase tracking-wider text-mist">
+              Save Event to Calendar
+            </p>
+            <AddToCalendarButton event={registration.event} />
           </div>
         )}
 

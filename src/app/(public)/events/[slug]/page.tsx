@@ -10,6 +10,8 @@ import { EventCard, CATEGORY_META } from "@/components/shared/EventCard";
 import { CategoryArtwork } from "@/components/shared/CategoryArtwork";
 import { EventDetailTabs } from "@/components/shared/EventDetailTabs";
 import { EventRegisterCard } from "@/components/shared/EventRegisterCard";
+import { AddToCalendarButton } from "@/components/shared/AddToCalendarButton";
+import { isCalendarEligible } from "@/features/events/events.calendar";
 import { StickyRegisterBar } from "@/features/events/components/StickyRegisterBar";
 import { EventsService, type EventWithDerivedStatus } from "@/features/events/services/events.service";
 import type { EventDetailItem } from "@/features/events/repositories/events.repository";
@@ -346,13 +348,25 @@ async function EventRegisterSection({
     );
   }
 
+  const canAddToCalendar = isCalendarEligible(event.item);
+
   return (
     <>
-      <EventRegisterCard
-        event={event}
-        isLoggedIn={isLoggedIn}
-        existingRegistration={existingRegistration}
-      />
+      <div className="space-y-3">
+        <EventRegisterCard
+          event={event}
+          isLoggedIn={isLoggedIn}
+          existingRegistration={existingRegistration}
+        />
+        {canAddToCalendar && (
+          <div className="p-4 bg-white rounded-2xl border border-navy-100 shadow-xs space-y-2">
+            <p className="text-[11px] font-bold uppercase tracking-wider text-mist">
+              Save Event
+            </p>
+            <AddToCalendarButton event={event.item} />
+          </div>
+        )}
+      </div>
       <StickyRegisterBar
         event={event.item}
         derivedStatus={event.derivedStatus}
