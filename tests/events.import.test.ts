@@ -3,9 +3,14 @@ import {
   parsePktDateToUtc,
   mapCategory,
   prepareEvent,
+  prepareResult,
+  shouldSkipResult,
+  shouldPublishResults,
+  formatResultErrorMessage,
   parseCliArgs,
   OWNER_CATEGORY_OVERRIDES,
   type RawEventInput,
+  type RawResultInput,
   type EventDefaults,
 } from "../scripts/import-past-events";
 
@@ -71,6 +76,7 @@ describe("Past Events Import - Pure Helpers", () => {
 
       expect(mapCategory("social / festival", "qurban-carnival-2025")).toBe("CULTURAL");
       expect(mapCategory("cultural / religious", "mehfil-e-naat-2025")).toBe("CULTURAL");
+      expect(mapCategory("cultural / religious", "mehfil-e-naat-2025-tilawat")).toBe("CULTURAL");
       expect(mapCategory("cultural", "culture-festival")).toBe("CULTURAL");
       expect(mapCategory("technical", "ai-and-it-expo-2025")).toBe("TECHNICAL");
     });
@@ -130,6 +136,157 @@ describe("Past Events Import - Pure Helpers", () => {
       });
       expect(prepared).not.toBeNull();
       expect(prepared?.startsAt.toISOString()).toBe("2025-06-15T05:00:00.000Z");
+    });
+  });
+
+  describe("prepareResult & result helpers", () => {
+    const rawResult: RawResultInput = {
+      eventSlug: "mehfil-e-naat-2025",
+      position: 1,
+      award: "1st Position - Naat",
+      customParticipantName: "Tehreem",
+      segment: "Naat",
+      isTie: false,
+    };
+
+    it("maps raw result to Result database shape with null registrationId", () => {
+      const prepared = prepareResult(rawResult, "evt-123");
+      expect(prepared).toEqual({
+        eventId: "evt-123",
+        eventSlug: "mehfil-e-naat-2025",
+        position: 1,
+        award: "1st Position - Naat",
+        customParticipantName: "Tehreem",
+        isTie: false,
+        registrationId: null,
+      });
+    });
+
+    it("detects existing results idempotently based on eventId, position, and participant name", () => {
+      const existing = [
+        {
+          eventId: "evt-123",
+          customParticipantName: "Tehreem",
+          position: 1,
+        },
+      ];
+
+      expect(
+        shouldSkipResult(existing, {
+          eventId: "evt-123",
+          customParticipantName: "Tehreem",
+          position: 1,
+        })
+      ).toBe(true);
+
+      // Case-insensitive match
+      expect(
+        shouldSkipResult(existing, {
+          eventId: "evt-123",
+          customParticipantName: "  tehreem  ",
+          position: 1,
+        })
+      ).toBe(true);
+
+      // Different participant
+      expect(
+        shouldSkipResult(existing, {
+          eventId: "evt-123",
+          customParticipantName: "Urwa",
+          position: 1,
+        })
+      ).toBe(false);
+
+      // Different position
+      expect(
+        shouldSkipResult(existing, {
+          eventId: "evt-123",
+          customParticipantName: "Tehreem",
+          position: 2,
+        })
+      ).toBe(false);
+
+      // Different event
+      expect(
+        shouldSkipResult(existing, {
+          eventId: "evt-456",
+          customParticipantName: "Tehreem",
+          position: 1,
+        })
+      ).toBe(false);
+    });
+
+    it("decides shouldPublishResults correctly", () => {
+      expect(
+        shouldPublishResults(
+          { publishResultsAfterImport: true },
+          2, // created
+          0  // existing
+        )
+      ).toBe(true);
+
+      expect(
+        shouldPublishResults(
+          { publishResultsAfterImport: true },
+          0,
+          2  // existing
+        )
+      ).toBe(true);
+
+      // No results
+      expect(
+        shouldPublishResults(
+          { publishResultsAfterImport: true },
+          0,
+          0
+        )
+      ).toBe(false);
+
+      // Event does not request publishing
+      expect(
+        shouldPublishResults(
+          { publishResultsAfterImport: false },
+          2,
+          0
+        )
+      ).toBe(false);
+
+      expect(
+        shouldPublishResults(
+          {},
+          2,
+          0
+        )
+      ).toBe(false);
+    });
+  });
+
+  describe("formatResultErrorMessage", () => {
+    it("handles Prisma P2002 unique constraint violations clearly", () => {
+      const p2002Err = {
+        code: "P2002",
+        message: "Unique constraint failed on the constraint: results_event_podium_unique_idx",
+      };
+      const msg = formatResultErrorMessage(p2002Err, {
+        eventSlug: "mehfil-e-naat-2025",
+        position: 1,
+        customParticipantName: "Urwa",
+      });
+      expect(msg).toContain("P2002");
+      expect(msg).toContain("Urwa");
+      expect(msg).toContain("mehfil-e-naat-2025");
+      expect(msg).toContain("Unique constraint violation");
+    });
+
+    it("handles generic Error instances", () => {
+      const genericErr = new Error("Connection timeout");
+      const msg = formatResultErrorMessage(genericErr, {
+        eventSlug: "mehfil-e-naat-2025",
+        position: 1,
+        customParticipantName: "Urwa",
+      });
+      expect(msg).toContain("Connection timeout");
+      expect(msg).toContain("Urwa");
     });
   });
 

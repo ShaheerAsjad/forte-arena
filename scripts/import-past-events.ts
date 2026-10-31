@@ -27,6 +27,16 @@ export interface RawEventInput {
   description: string;
   posterFile: string;
   posterNote?: string;
+  publishResultsAfterImport?: boolean;
+}
+
+export interface RawResultInput {
+  eventSlug: string;
+  position: number;
+  award: string;
+  customParticipantName: string;
+  segment?: string;
+  isTie?: boolean;
 }
 
 export interface EventDefaults {
@@ -49,9 +59,11 @@ export interface EventsJsonFile {
     source?: string;
     timezone?: string;
     defaultStartTimeIfOnlyDateKnown?: string;
+    alreadyImported?: string[];
   };
   defaults: EventDefaults;
   events: RawEventInput[];
+  results?: RawResultInput[];
 }
 
 export interface PreparedEvent {
@@ -75,6 +87,17 @@ export interface PreparedEvent {
   resultsPublished: boolean;
   createdById: string;
   posterFile: string;
+  publishResultsAfterImport?: boolean;
+}
+
+export interface PreparedResult {
+  eventId: string;
+  eventSlug: string;
+  position: number;
+  award: string;
+  customParticipantName: string;
+  isTie: boolean;
+  registrationId: null;
 }
 
 /**
@@ -86,6 +109,7 @@ export const OWNER_CATEGORY_OVERRIDES: Record<string, EventCategory> = {
   "forte-alpine-adventure-snow-edition": "OTHER",
   "qurban-carnival-2025": "CULTURAL",
   "mehfil-e-naat-2025": "CULTURAL",
+  "mehfil-e-naat-2025-tilawat": "CULTURAL",
   "culture-festival": "CULTURAL",
   "ai-and-it-expo-2025": "TECHNICAL",
 };
@@ -148,11 +172,6 @@ export function mapCategory(hint: string, slug?: string): EventCategory {
 
 /**
  * Interprets a date in Asia/Karachi (UTC+5, no DST) and converts it to a UTC Date instant.
- * Supported formats:
- * - Full ISO string with offset: "2025-07-23T10:00:00+05:00"
- * - ISO date without time: "2025-07-23" -> default 10:00 PKT -> 05:00 UTC
- * - Space separated: "2025-07-23 10:00"
- * - DD-MM-YYYY or DD/MM/YYYY: "23-07-2025" or "23/07/2025 14:00"
  */
 export function parsePktDateToUtc(
   dateInput: string | Date | null | undefined,
@@ -236,7 +255,6 @@ export function prepareEvent(
   const dateStr = overrides?.customDate || raw.startsAt;
   const parsedStartsAt = parsePktDateToUtc(dateStr);
 
-  // An event whose date is missing must NOT be imported
   if (!parsedStartsAt) {
     return null;
   }
@@ -265,7 +283,84 @@ export function prepareEvent(
     resultsPublished: defaults.resultsPublished,
     createdById: organizerId,
     posterFile: raw.posterFile,
+    publishResultsAfterImport: raw.publishResultsAfterImport,
   };
+}
+
+/**
+ * Pure function: Prepares a database Result payload.
+ */
+export function prepareResult(
+  raw: RawResultInput,
+  eventId: string
+): PreparedResult {
+  return {
+    eventId,
+    eventSlug: raw.eventSlug,
+    position: raw.position,
+    award: raw.award,
+    customParticipantName: raw.customParticipantName.trim(),
+    isTie: raw.isTie ?? false,
+    registrationId: null,
+  };
+}
+
+/**
+ * Pure function: Determines if a result already exists in DB (idempotence).
+ */
+export function shouldSkipResult(
+  existingResults: Array<{
+    eventId: string;
+    customParticipantName: string | null;
+    position: number;
+  }>,
+  target: {
+    eventId: string;
+    customParticipantName: string;
+    position: number;
+  }
+): boolean {
+  return existingResults.some(
+    (r) =>
+      r.eventId === target.eventId &&
+      r.position === target.position &&
+      r.customParticipantName?.trim().toLowerCase() ===
+        target.customParticipantName.trim().toLowerCase()
+  );
+}
+
+/**
+ * Pure function: Determines if resultsPublished should be updated to true on the event.
+ */
+export function shouldPublishResults(
+  eventConfig: { publishResultsAfterImport?: boolean },
+  resultsCreatedCount: number,
+  existingResultsCount: number
+): boolean {
+  return Boolean(
+    eventConfig.publishResultsAfterImport &&
+      (resultsCreatedCount > 0 || existingResultsCount > 0)
+  );
+}
+
+/**
+ * Pure function: Formats an error encountered when inserting a result into the database.
+ * Specially identifies Prisma P2002 unique constraint violations (e.g. podium unique index).
+ */
+export function formatResultErrorMessage(
+  err: unknown,
+  target: {
+    eventSlug: string;
+    position: number;
+    customParticipantName: string;
+  }
+): string {
+  const code = (err as { code?: string })?.code;
+  if (code === "P2002") {
+    return `[P2002 Unique Constraint] Failed to create result for "${target.customParticipantName}" (#${target.position} in "${target.eventSlug}"): Unique constraint violation (podium position already occupied or duplicate entry).`;
+  }
+  const message = err instanceof Error ? err.message : String(err);
+  return `Failed to create result for "${target.customParticipantName}" (#${target.position} in "${target.eventSlug}"): ${message}`;
 }
 
 export function parseCliArgs(argv: string[]): {
@@ -337,11 +432,16 @@ export async function runImportScript(argv: string[] = process.argv.slice(2)): P
 
     const defaultOrganizer = organizers[0];
 
-    // Check existing slugs in database
+    // Check existing events in database
     const existingEvents = await prisma.event.findMany({
-      select: { slug: true },
+      select: { id: true, slug: true, title: true, resultsPublished: true },
     });
-    const existingSlugSet = new Set(existingEvents.map((e) => e.slug));
+    const existingEventMap = new Map(existingEvents.map((e) => [e.slug, e]));
+
+    // Check existing results in database
+    const existingResults = await prisma.result.findMany({
+      select: { id: true, eventId: true, customParticipantName: true, position: true, award: true },
+    });
 
     console.log("=========================================");
     console.log("Forté Arena - Past Events Import");
@@ -349,7 +449,8 @@ export async function runImportScript(argv: string[] = process.argv.slice(2)): P
     console.log(`Data directory:     ${resolvedDir}`);
     console.log(`Organizer assigned: ${defaultOrganizer.name} (${defaultOrganizer.email}) [${defaultOrganizer.id}]`);
     console.log(`Mode:               ${isExecute ? "EXECUTE" : "DRY RUN"}`);
-    console.log(`Total events in file: ${data.events.length}`);
+    console.log(`Events in file:     ${data.events.length}`);
+    console.log(`Results in file:    ${data.results?.length ?? 0}`);
     console.log("=========================================\n");
 
     const preparedList: {
@@ -360,6 +461,7 @@ export async function runImportScript(argv: string[] = process.argv.slice(2)): P
       slugExists: boolean;
     }[] = [];
 
+    console.log("--- EVENTS ---");
     for (const raw of data.events) {
       const posterPath = path.join(resolvedDir, raw.posterFile);
       let posterSize = 0;
@@ -367,7 +469,7 @@ export async function runImportScript(argv: string[] = process.argv.slice(2)): P
         posterSize = fs.statSync(posterPath).size;
       }
 
-      const slugExists = existingSlugSet.has(raw.slug);
+      const slugExists = existingEventMap.has(raw.slug);
       const prepared = prepareEvent(raw, data.defaults, defaultOrganizer.id);
 
       preparedList.push({
@@ -387,8 +489,29 @@ export async function runImportScript(argv: string[] = process.argv.slice(2)): P
         console.log(`  - StartsAt (PKT): ${pktTime}`);
       }
       console.log(`  - Poster:         ${raw.posterFile} (${posterSize > 0 ? `${(posterSize / 1024).toFixed(1)} KB` : "FILE NOT FOUND"})`);
-      console.log(`  - Slug in DB:     ${slugExists ? "EXISTS (will skip)" : "New"}`);
+      console.log(`  - Slug in DB:     ${slugExists ? "EXISTS (will skip creation)" : "New"}`);
       console.log(`  - Status:         ${prepared ? (slugExists ? "SKIP (already in DB)" : "READY TO IMPORT") : "SKIP (missing date)"}\n`);
+    }
+
+    console.log("--- RESULTS ---");
+    const rawResults = data.results ?? [];
+    for (const res of rawResults) {
+      const eventInDb = existingEventMap.get(res.eventSlug);
+      const eventInFile = data.events.find((e) => e.slug === res.eventSlug);
+      const existsInDb = eventInDb
+        ? shouldSkipResult(existingResults, {
+            eventId: eventInDb.id,
+            customParticipantName: res.customParticipantName,
+            position: res.position,
+          })
+        : false;
+
+      console.log(`[Result] Event: ${res.eventSlug}`);
+      console.log(`  - Position:    ${res.position}`);
+      console.log(`  - Award:       ${res.award}`);
+      console.log(`  - Winner:      ${res.customParticipantName} (segment: ${res.segment ?? "none"})`);
+      console.log(`  - Event found: ${eventInDb ? "Found in DB" : eventInFile ? "Will be created in this run" : "NOT FOUND"}`);
+      console.log(`  - Status:      ${existsInDb ? "SKIP (already in DB)" : "READY TO CREATE"}\n`);
     }
 
     if (!isExecute) {
@@ -413,14 +536,17 @@ export async function runImportScript(argv: string[] = process.argv.slice(2)): P
     });
 
     const createdEvents: {
+      id: string;
       slug: string;
       title: string;
       status: string;
       startsAt: string;
       posterUrl: string;
       httpStatus?: number;
+      publishResultsAfterImport?: boolean;
     }[] = [];
 
+    // 1. Process Events
     for (const item of preparedList) {
       if (!item.prepared) {
         console.log(`Skipping "${item.raw.title}": date is missing.`);
@@ -462,7 +588,7 @@ export async function runImportScript(argv: string[] = process.argv.slice(2)): P
       const posterUrl = publicUrlData.publicUrl;
 
       try {
-        await prisma.event.create({
+        const createdRow = await prisma.event.create({
           data: {
             slug: item.prepared.slug,
             title: item.prepared.title,
@@ -487,6 +613,14 @@ export async function runImportScript(argv: string[] = process.argv.slice(2)): P
           },
         });
 
+        // Add to existing map so result processing can find it
+        existingEventMap.set(createdRow.slug, {
+          id: createdRow.id,
+          slug: createdRow.slug,
+          title: createdRow.title,
+          resultsPublished: createdRow.resultsPublished,
+        });
+
         // Verify URL accessibility
         let httpStatus: number | undefined;
         try {
@@ -497,12 +631,14 @@ export async function runImportScript(argv: string[] = process.argv.slice(2)): P
         }
 
         createdEvents.push({
+          id: createdRow.id,
           slug: item.prepared.slug,
           title: item.prepared.title,
           status: item.prepared.status,
           startsAt: item.prepared.startsAt.toISOString(),
           posterUrl,
           httpStatus,
+          publishResultsAfterImport: item.prepared.publishResultsAfterImport,
         });
 
         console.log(`Successfully created event: "${item.prepared.title}" (HTTP Status: ${httpStatus})\n`);
@@ -510,6 +646,99 @@ export async function runImportScript(argv: string[] = process.argv.slice(2)): P
         console.error(`Failed to insert event into DB. Deleting uploaded poster to prevent orphans...`);
         await supabase.storage.from(bucket).remove([storageFilePath]);
         console.error(`Error details:`, dbErr instanceof Error ? dbErr.message : dbErr);
+      }
+    }
+
+    // 2. Process Results
+    const createdResults: {
+      eventSlug: string;
+      position: number;
+      award: string;
+      winner: string;
+    }[] = [];
+
+    const resultsPerEvent = new Map<string, number>();
+
+    for (const rawRes of rawResults) {
+      const event = existingEventMap.get(rawRes.eventSlug);
+      if (!event) {
+        console.error(`Error: Event with slug "${rawRes.eventSlug}" not found in database. Cannot create result.`);
+        continue;
+      }
+
+      // Check idempotence
+      const alreadyExists = shouldSkipResult(existingResults, {
+        eventId: event.id,
+        customParticipantName: rawRes.customParticipantName,
+        position: rawRes.position,
+      });
+
+      if (alreadyExists) {
+        console.log(`Skipping result for "${rawRes.customParticipantName}" in "${rawRes.eventSlug}": already exists.`);
+        continue;
+      }
+
+      const preparedRes = prepareResult(rawRes, event.id);
+
+      try {
+        const createdRes = await prisma.result.create({
+          data: {
+            eventId: preparedRes.eventId,
+            position: preparedRes.position,
+            award: preparedRes.award,
+            customParticipantName: preparedRes.customParticipantName,
+            isTie: preparedRes.isTie,
+            registrationId: null,
+          },
+        });
+
+        // Update in-memory existing results
+        existingResults.push({
+          id: createdRes.id,
+          eventId: createdRes.eventId,
+          customParticipantName: createdRes.customParticipantName,
+          position: createdRes.position,
+          award: createdRes.award,
+        });
+
+        const currentCount = resultsPerEvent.get(event.id) ?? 0;
+        resultsPerEvent.set(event.id, currentCount + 1);
+
+        createdResults.push({
+          eventSlug: rawRes.eventSlug,
+          position: createdRes.position,
+          award: createdRes.award || "",
+          winner: createdRes.customParticipantName || "",
+        });
+
+        console.log(`Created result: [${rawRes.eventSlug}] #${createdRes.position} - ${createdRes.award} (${createdRes.customParticipantName})`);
+      } catch (err) {
+        const errorMsg = formatResultErrorMessage(err, {
+          eventSlug: rawRes.eventSlug,
+          position: rawRes.position,
+          customParticipantName: rawRes.customParticipantName,
+        });
+        console.error(errorMsg);
+      }
+    }
+
+    // 3. Update resultsPublished for events with publishResultsAfterImport
+    for (const eventItem of data.events) {
+      if (eventItem.publishResultsAfterImport) {
+        const event = existingEventMap.get(eventItem.slug);
+        if (event) {
+          const resultsForThisEvent = existingResults.filter((r) => r.eventId === event.id).length;
+          if (resultsForThisEvent > 0 && !event.resultsPublished) {
+            await prisma.event.update({
+              where: { id: event.id },
+              data: { resultsPublished: true },
+            });
+            event.resultsPublished = true;
+            console.log(`Set resultsPublished = true on event "${event.title}" (${event.slug}).`);
+          } else if (resultsForThisEvent > 0 && event.resultsPublished) {
+            console.log(`Event "${event.title}" (${event.slug}) already has resultsPublished = true.`);
+          }
+        }
       }
     }
 
@@ -524,8 +753,15 @@ export async function runImportScript(argv: string[] = process.argv.slice(2)): P
       console.log(`  HTTP Status: ${evt.httpStatus ?? "UNKNOWN"}`);
     }
 
-    const finalCount = await prisma.event.count();
-    console.log(`\nTotal events in database now: ${finalCount}`);
+    console.log(`\nSuccessfully created ${createdResults.length} results:`);
+    for (const res of createdResults) {
+      console.log(`- [${res.eventSlug}] #${res.position} - ${res.award} (${res.winner})`);
+    }
+
+    const finalEventCount = await prisma.event.count();
+    const finalResultCount = await prisma.result.count();
+    console.log(`\nTotal events in database now:  ${finalEventCount}`);
+    console.log(`Total results in database now: ${finalResultCount}`);
   } finally {
     await pool.end();
   }
