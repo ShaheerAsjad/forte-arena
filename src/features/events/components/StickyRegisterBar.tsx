@@ -96,11 +96,14 @@ export function StickyRegisterBar({
               </div>
 
               {/* Mobile-only short title */}
-              <div className="sm:hidden flex flex-col min-w-0">
-                <p className="font-heading font-bold text-xs text-ivory truncate max-w-[170px]">
+              <div className="sm:hidden flex flex-col min-w-0 flex-1">
+                <p
+                  className="font-heading font-bold text-xs text-ivory truncate max-w-full"
+                  title={event.title}
+                >
                   {event.title}
                 </p>
-                <span className="text-[10px] text-gold-400 font-medium">
+                <span className="text-[10px] text-gold-400 font-medium truncate" title={remainingSeats !== null ? `${remainingSeats} spots left` : event.venue}>
                   {remainingSeats !== null ? `${remainingSeats} spots left` : event.venue}
                 </span>
               </div>

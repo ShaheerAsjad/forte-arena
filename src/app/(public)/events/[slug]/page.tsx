@@ -5,6 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { Badge } from "@/components/ui/Badge";
 import { Card } from "@/components/ui/Card";
+import { Skeleton } from "@/components/ui/Skeleton";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { EventCard, CATEGORY_META } from "@/components/shared/EventCard";
 import { CategoryArtwork } from "@/components/shared/CategoryArtwork";
@@ -14,7 +15,17 @@ import { AddToCalendarButton } from "@/components/shared/AddToCalendarButton";
 import { isCalendarEligible } from "@/features/events/events.calendar";
 import { StickyRegisterBar } from "@/features/events/components/StickyRegisterBar";
 import { EventsService, type EventWithDerivedStatus } from "@/features/events/services/events.service";
-import type { EventDetailItem } from "@/features/events/repositories/events.repository";
+import { EventsRepository, type EventDetailItem } from "@/features/events/repositories/events.repository";
+import {
+  getCandidateParentSlugs,
+  findChildEvents,
+  getChildSubHeading,
+} from "@/features/events/events.relation";
+import {
+  EventWinnersSection,
+  type ChildCompetitionWinners,
+} from "@/features/events/components/EventWinnersSection";
+import { ResultsService } from "@/features/results/services/results.service";
 import { RegistrationsRepository } from "@/features/registrations/repositories/registrations.repository";
 import { AnnouncementsService } from "@/features/announcements/services/announcements.service";
 import { formatEventFullDate, formatEventTime, formatEventDate } from "@/lib/dates";
@@ -82,17 +93,6 @@ export default function EventDetailPage({ params }: EventDetailPageProps) {
       {/* Blueprint Grid Texture */}
       <div className="absolute inset-0 -z-10 bg-[linear-gradient(to_right,rgba(0,15,64,0.04)_1px,transparent_1px),linear-gradient(to_bottom,rgba(0,15,64,0.04)_1px,transparent_1px)] bg-[size:4rem_4rem] [mask-image:radial-gradient(ellipse_70%_50%_at_50%_20%,#000_70%,transparent_100%)] pointer-events-none" />
 
-      {/* Top Back Navigation */}
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 pt-4">
-        <Link
-          href="/events"
-          className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-semibold text-mist hover:text-navy-950 transition-colors"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          <span>Back to All Competitions</span>
-        </Link>
-      </div>
-
       <Suspense fallback={<EventDetailSkeleton />}>
         <EventDetailContent params={params} />
       </Suspense>
@@ -112,13 +112,72 @@ async function EventDetailContent({ params }: EventDetailPageProps) {
   const categoryMeta = CATEGORY_META[item.category] || CATEGORY_META.OTHER;
   const CategoryIcon = categoryMeta.icon;
 
-  const [relatedEvents, eventAnnouncements] = await Promise.all([
-    EventsService.getRelatedEvents(item.category, item.slug, 3),
-    AnnouncementsService.getAnnouncementsForEvent(item.id),
-  ]);
+  // 1. Parent event detection for child competitions
+  const candidateParentSlugs = getCandidateParentSlugs(item.slug);
+  let parentEvent: { slug: string; title: string } | null = null;
+  for (const cand of candidateParentSlugs) {
+    const parentCandidate = await EventsRepository.getEventBySlug(cand);
+    if (parentCandidate) {
+      parentEvent = {
+        slug: parentCandidate.slug,
+        title: parentCandidate.title,
+      };
+      break;
+    }
+  }
+
+  // 2. Fetch related events, notices, and published results using the same repository function as /results/[slug]
+  const [relatedEvents, eventAnnouncements, allPublishedEvents, mainResultsData] =
+    await Promise.all([
+      EventsService.getRelatedEvents(item.category, item.slug, 3),
+      AnnouncementsService.getAnnouncementsForEvent(item.id),
+      ResultsService.getPublishedResultsEvents(),
+      item.resultsPublished ? ResultsService.getEventResults(item.slug) : null,
+    ]);
+
+  const mainResults = mainResultsData?.results ?? [];
+
+  // 3. Find related child competitions with published results
+  const childPublished = findChildEvents(item.slug, allPublishedEvents);
+  const childCompetitionsWithResults: ChildCompetitionWinners[] = [];
+  for (const child of childPublished) {
+    const childRes = await ResultsService.getEventResults(child.slug);
+    if (childRes && childRes.results.length > 0) {
+      childCompetitionsWithResults.push({
+        slug: childRes.slug,
+        title: childRes.title,
+        subHeading: getChildSubHeading(item.title, childRes.title),
+        results: childRes.results,
+      });
+    }
+  }
 
   return (
     <>
+      {/* Top Back Navigation & Parent Relation Link */}
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 pt-4 flex items-center justify-between gap-4 flex-wrap">
+        <Link
+          href="/events"
+          className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-semibold text-mist hover:text-navy-950 dark:hover:text-white transition-colors"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          <span>Back to All Competitions</span>
+        </Link>
+
+        {parentEvent && (
+          <Link
+            href={`/events/${parentEvent.slug}`}
+            className="inline-flex items-center gap-1.5 text-xs font-semibold text-gold-700 dark:text-gold-300 bg-gold-50 dark:bg-gold-950/60 border border-gold-300/80 dark:border-gold-800/80 px-3 py-1 rounded-full hover:bg-gold-100 dark:hover:bg-gold-900/60 transition-colors"
+            title={`Part of ${parentEvent.title}`}
+          >
+            <span className="text-mist dark:text-slate-400 font-normal">Part of:</span>
+            <span className="font-bold underline decoration-gold-400/60 underline-offset-2">
+              {parentEvent.title}
+            </span>
+          </Link>
+        )}
+      </div>
+
       {/* Hero Poster Banner */}
       <section className="max-w-6xl mx-auto px-4 sm:px-6">
         <div className="relative rounded-3xl overflow-hidden bg-gradient-to-br from-navy-950 via-navy-900 to-navy-950 text-ivory border border-navy-800 shadow-xl">
@@ -160,6 +219,15 @@ async function EventDetailContent({ params }: EventDetailPageProps) {
               <Badge variant="navy">
                 {item.participationType === "TEAM" ? "Team Event" : "Solo Event"}
               </Badge>
+              {parentEvent && (
+                <Link
+                  href={`/events/${parentEvent.slug}`}
+                  className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-gold-400/20 text-gold-300 border border-gold-400/40 hover:bg-gold-400/30 transition-colors"
+                >
+                  <span className="text-ivory/70 font-normal">Part of:</span>
+                  <span className="underline underline-offset-2">{parentEvent.title}</span>
+                </Link>
+              )}
             </div>
 
             <div className="space-y-3">
@@ -235,14 +303,17 @@ async function EventDetailContent({ params }: EventDetailPageProps) {
                 <div className="space-y-3 divide-y divide-navy-100/60">
                   {eventAnnouncements.map((u) => (
                     <div key={u.id} className="pt-2.5 first:pt-0 space-y-1">
-                      <div className="flex items-center justify-between gap-2">
-                        <h4 className="text-xs font-bold text-navy-950 flex items-center gap-1.5">
+                      <div className="flex items-center justify-between gap-2 min-w-0">
+                        <h4
+                          className="text-xs font-bold text-navy-950 flex items-center gap-1.5 min-w-0 flex-1 truncate"
+                          title={u.title}
+                        >
                           {u.pinned && (
-                            <span className="text-[10px] font-bold text-gold-800 bg-gold-100 px-1.5 py-0.2 rounded border border-gold-300">
+                            <span className="text-[10px] font-bold text-gold-800 bg-gold-100 px-1.5 py-0.2 rounded border border-gold-300 shrink-0">
                               PINNED
                             </span>
                           )}
-                          <span>{u.title}</span>
+                          <span className="truncate">{u.title}</span>
                         </h4>
                         <span className="text-[10px] text-mist shrink-0">
                           {formatEventDate(u.createdAt)}
@@ -287,6 +358,14 @@ async function EventDetailContent({ params }: EventDetailPageProps) {
         </div>
       </section>
 
+      {/* Official Winners Section (shown only when event or child competitions have published results) */}
+      <EventWinnersSection
+        eventTitle={item.title}
+        eventSlug={item.slug}
+        results={mainResults}
+        childCompetitions={childCompetitionsWithResults}
+      />
+
       {/* Related Events Section */}
       {relatedEvents.length > 0 && (
         <section className="max-w-6xl mx-auto px-4 sm:px-6 pt-10 border-t border-navy-100 space-y-6">
@@ -315,6 +394,9 @@ async function EventDetailContent({ params }: EventDetailPageProps) {
 function EventDetailSkeleton() {
   return (
     <div className="space-y-12 max-w-6xl mx-auto px-4 sm:px-6">
+      <div className="pt-4">
+        <Skeleton className="h-5 w-40 rounded-md" />
+      </div>
       <Card className="h-64 sm:h-96 bg-navy-900 rounded-3xl animate-pulse border-navy-800" />
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
         <div className="lg:col-span-8">

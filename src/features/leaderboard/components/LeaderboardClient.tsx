@@ -561,7 +561,7 @@ export function LeaderboardClient({
                             </div>
                           </div>
                         )}
-                        <LeaderboardBreakdownList breakdown={item.breakdown} />
+                        <LeaderboardBreakdownList breakdown={item.breakdown} columns={1} />
                       </div>
                     )}
                   </div>
@@ -708,7 +708,7 @@ export function LeaderboardClient({
                             </div>
                           </div>
                         )}
-                        <LeaderboardBreakdownList breakdown={item.breakdown} />
+                        <LeaderboardBreakdownList breakdown={item.breakdown} columns={2} />
                       </div>
                     )}
                   </div>
@@ -946,7 +946,7 @@ function MobilePodiumCard({
           )}
           <LeaderboardBreakdownList
             breakdown={entry.breakdown}
-            gridClassName="grid-cols-1"
+            columns={1}
           />
         </div>
       )}
@@ -1097,7 +1097,7 @@ function PodiumCard({ entry, isExpanded, onToggleExpand }: PodiumCardProps) {
           )}
           <LeaderboardBreakdownList
             breakdown={entry.breakdown}
-            gridClassName="grid-cols-1"
+            columns={1}
           />
         </div>
       )}

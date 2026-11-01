@@ -30,9 +30,12 @@ export function ResultsPodium({ results, eventSlug }: ResultsPodiumProps) {
                 <div className="w-14 h-14 rounded-full bg-slate-200 border-2 border-slate-300 flex items-center justify-center shadow-inner">
                   <Medal className="w-8 h-8 text-slate-600" />
                 </div>
-                <div className="space-y-1">
+                <div className="space-y-1 w-full min-w-0">
                   <Badge variant="navy" size="sm">2nd Place (Runner-Up)</Badge>
-                  <h4 className="font-heading text-lg font-bold text-navy-950 pt-1">
+                  <h4
+                    className="font-heading text-lg font-bold text-navy-950 pt-1 truncate max-w-full"
+                    title={second.winnerName}
+                  >
                     {second.winnerName}
                   </h4>
                   {second.teamName && (
@@ -73,9 +76,12 @@ export function ResultsPodium({ results, eventSlug }: ResultsPodiumProps) {
                 <div className="w-16 h-16 rounded-full bg-gold-400 border-2 border-gold-200 flex items-center justify-center shadow-md">
                   <Trophy className="w-9 h-9 text-navy-950" />
                 </div>
-                <div className="space-y-1">
+                <div className="space-y-1 w-full min-w-0">
                   <Badge variant="gold" size="sm">Champion (1st Place)</Badge>
-                  <h4 className="font-heading text-xl font-extrabold text-navy-950 pt-1">
+                  <h4
+                    className="font-heading text-xl font-extrabold text-navy-950 pt-1 truncate max-w-full"
+                    title={first.winnerName}
+                  >
                     {first.winnerName}
                   </h4>
                   {first.teamName && (
@@ -114,9 +120,12 @@ export function ResultsPodium({ results, eventSlug }: ResultsPodiumProps) {
                 <div className="w-14 h-14 rounded-full bg-amber-200 border-2 border-amber-300 flex items-center justify-center shadow-inner">
                   <Award className="w-8 h-8 text-amber-800" />
                 </div>
-                <div className="space-y-1">
+                <div className="space-y-1 w-full min-w-0">
                   <Badge variant="warning" size="sm">3rd Place</Badge>
-                  <h4 className="font-heading text-lg font-bold text-navy-950 pt-1">
+                  <h4
+                    className="font-heading text-lg font-bold text-navy-950 pt-1 truncate max-w-full"
+                    title={third.winnerName}
+                  >
                     {third.winnerName}
                   </h4>
                   {third.teamName && (
@@ -164,27 +173,36 @@ export function ResultsPodium({ results, eventSlug }: ResultsPodiumProps) {
                 key={r.id}
                 className="p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-navy-50/50 transition-colors"
               >
-                <div className="flex items-center gap-4">
+                <div className="flex items-center gap-4 min-w-0 flex-1">
                   <div className="w-8 h-8 rounded-full bg-navy-100 text-navy-900 font-bold text-sm flex items-center justify-center shrink-0">
                     #{r.position}
                   </div>
-                  <div>
-                    <h5 className="font-heading text-sm font-bold text-navy-950">
+                  <div className="min-w-0 flex-1">
+                    <h5
+                      className="font-heading text-sm font-bold text-navy-950 truncate max-w-full"
+                      title={r.winnerName}
+                    >
                       {r.winnerName}
                     </h5>
-                    <div className="flex items-center gap-2 text-xs text-mist">
+                    <div className="flex items-center gap-2 text-xs text-mist flex-wrap">
                       {r.teamName && (
-                        <span className="flex items-center gap-1 text-ink/70">
-                          <Users className="w-3 h-3" />
-                          {r.teamName}
+                        <span className="flex items-center gap-1 text-ink/70 min-w-0">
+                          <Users className="w-3 h-3 shrink-0" />
+                          <span className="truncate max-w-[140px]" title={r.teamName}>
+                            {r.teamName}
+                          </span>
                         </span>
                       )}
-                      {r.department && <span>• {r.department}</span>}
+                      {r.department && (
+                        <span className="truncate max-w-[160px]" title={r.department}>
+                          • {r.department}
+                        </span>
+                      )}
                     </div>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-3 self-end sm:self-center">
+                <div className="flex items-center gap-3 self-end sm:self-center shrink-0">
                   {r.award && (
                     <Badge variant="outline" size="sm">
                       {r.award}

@@ -102,23 +102,29 @@ async function ResultsListLoader() {
               {/* Podium Preview Strip */}
               <div className="pt-3 border-t border-navy-100 space-y-2 text-xs">
                 {first && (
-                  <div className="flex items-center justify-between p-2 rounded-xl bg-amber-50/80 border border-amber-200/60 font-semibold text-navy-950">
-                    <span className="flex items-center gap-1.5 text-amber-700">
+                  <div className="flex items-center justify-between gap-2 p-2 rounded-xl bg-amber-50/80 border border-amber-200/60 font-semibold text-navy-950 min-w-0">
+                    <span className="flex items-center gap-1.5 text-amber-700 shrink-0">
                       <Trophy className="w-3.5 h-3.5" />
                       1st Place
                     </span>
-                    <span className="truncate max-w-[140px] text-[11px] text-mist">
+                    <span
+                      className="truncate min-w-0 flex-1 text-right text-[11px] text-mist"
+                      title={first.award || "Winner"}
+                    >
                       {first.award || "Winner"}
                     </span>
                   </div>
                 )}
                 {second && (
-                  <div className="flex items-center justify-between p-1.5 px-2 rounded-lg bg-slate-50 text-ink/80 text-[11px]">
-                    <span className="flex items-center gap-1.5 text-slate-600 font-semibold">
+                  <div className="flex items-center justify-between gap-2 p-1.5 px-2 rounded-lg bg-slate-50 text-ink/80 text-[11px] min-w-0">
+                    <span className="flex items-center gap-1.5 text-slate-600 font-semibold shrink-0">
                       <Medal className="w-3.5 h-3.5" />
                       2nd Place
                     </span>
-                    <span className="truncate max-w-[140px] text-mist">
+                    <span
+                      className="truncate min-w-0 flex-1 text-right text-mist"
+                      title={second.award || "Runner Up"}
+                    >
                       {second.award || "Runner Up"}
                     </span>
                   </div>

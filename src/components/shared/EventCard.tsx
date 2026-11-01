@@ -137,8 +137,8 @@ export function EventCard({ event, className }: EventCardProps) {
 
           {/* Metadata Row */}
           <div className="space-y-2.5 pt-2 border-t border-navy-50">
-            <div className="flex items-center justify-between text-xs text-ink/80 font-medium">
-              <span className="inline-flex items-center gap-1.5 truncate">
+            <div className="flex items-center justify-between gap-2 text-xs text-ink/80 font-medium min-w-0">
+              <span className="inline-flex items-center gap-1.5 truncate min-w-0 flex-1" title={item.venue}>
                 <MapPin className="w-3.5 h-3.5 text-gold-500 shrink-0" />
                 <span className="truncate">{item.venue}</span>
               </span>

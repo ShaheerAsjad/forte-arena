@@ -16,6 +16,7 @@ import {
   parseLeaderboardView,
   getOrdinalSuffix,
   getMemberPreview,
+  getBreakdownGridClass,
 } from "@/features/leaderboard/leaderboard.config";
 import {
   aggregateStudentStandings,
@@ -1233,6 +1234,25 @@ describe("getMemberPreview Helper", () => {
       visible: [],
       hiddenCount: 3,
     });
+  });
+});
+
+describe("getBreakdownGridClass Helper", () => {
+  it("returns strict single-column grid class when columns is 1", () => {
+    expect(getBreakdownGridClass(1)).toBe("grid grid-cols-1 gap-2.5");
+  });
+
+  it("returns responsive two-column grid class when columns is 2", () => {
+    expect(getBreakdownGridClass(2)).toBe("grid grid-cols-1 sm:grid-cols-2 gap-2.5");
+  });
+
+  it("defaults to responsive two-column grid class when columns is undefined", () => {
+    expect(getBreakdownGridClass()).toBe("grid grid-cols-1 sm:grid-cols-2 gap-2.5");
+  });
+
+  it("respects customGridClass override when provided", () => {
+    expect(getBreakdownGridClass(1, "custom-grid-class")).toBe("custom-grid-class");
+    expect(getBreakdownGridClass(2, "my-grid")).toBe("my-grid");
   });
 });
 

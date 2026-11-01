@@ -91,3 +91,18 @@ export function getMemberPreview<T>(
   };
 }
 
+/**
+ * Pure helper to compute grid layout class for leaderboard breakdown list.
+ * columns === 1 guarantees a strict single-column layout across all viewports.
+ * columns === 2 or undefined defaults to 1 col on mobile, 2 cols from sm breakpoint up.
+ */
+export function getBreakdownGridClass(
+  columns?: 1 | 2,
+  customGridClass?: string
+): string {
+  if (customGridClass) return customGridClass;
+  return columns === 1
+    ? "grid grid-cols-1 gap-2.5"
+    : "grid grid-cols-1 sm:grid-cols-2 gap-2.5";
+}
+
