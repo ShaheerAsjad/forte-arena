@@ -14,6 +14,7 @@ export interface RawLeaderboardResultItem {
   id: string;
   position: number;
   award: string | null;
+  isTeam?: boolean;
   teamName: string | null;
   event: {
     id: string;
@@ -58,6 +59,7 @@ export class LeaderboardRepository {
         registration: {
           select: {
             id: true,
+            teamId: true,
             user: {
               select: {
                 id: true,
@@ -180,14 +182,17 @@ export class LeaderboardRepository {
     }
 
     return results.map((r) => {
+      const isTeam = Boolean(r.registration?.teamId || r.registration?.team);
       let teamName: string | null = null;
       const participants: RawLeaderboardParticipant[] = [];
 
-      if (r.registration?.team) {
+      if (isTeam && r.registration?.team) {
         const team = r.registration.team;
         teamName = team.name;
 
-        // Process team members
+        const seenKeys = new Set<string>();
+
+        // 1. Process team.members
         if (team.members && team.members.length > 0) {
           for (const m of team.members) {
             const normRoll = m.rollNumber ? m.rollNumber.trim().toUpperCase() : "";
@@ -197,20 +202,41 @@ export class LeaderboardRepository {
               (normRoll ? userByRoll.get(normRoll) : undefined) ||
               (normEmail ? userByEmail.get(normEmail) : undefined);
 
+            const isLeaderMatch =
+              (team.leader && team.leader.rollNumber && normRoll === team.leader.rollNumber.trim().toUpperCase()) ||
+              (team.leader && team.leader.id && matchedUser?.id === team.leader.id);
+
+            const userId = matchedUser?.id || (isLeaderMatch ? team.leader.id : undefined);
+            const dept = matchedUser?.department ?? (isLeaderMatch ? resolveDepartmentLabel(team.leader.department) : null);
+            const name = m.fullName || matchedUser?.name || (isLeaderMatch ? team.leader.name : "Team Member");
+            const roll = m.rollNumber?.trim() || (isLeaderMatch ? team.leader.rollNumber : null);
+
+            const memberKey = normRoll ? `roll:${normRoll}` : userId ? `user:${userId}` : `name:${name.trim().toLowerCase()}`;
+            if (!seenKeys.has(memberKey)) {
+              seenKeys.add(memberKey);
+              participants.push({
+                userId,
+                name,
+                rollNumber: roll || null,
+                department: dept,
+              });
+            }
+          }
+        }
+
+        // 2. Ensure team.leader is included if not already in participants
+        if (team.leader) {
+          const leaderNormRoll = team.leader.rollNumber ? team.leader.rollNumber.trim().toUpperCase() : "";
+          const leaderKey = leaderNormRoll ? `roll:${leaderNormRoll}` : `user:${team.leader.id}`;
+          if (!seenKeys.has(leaderKey)) {
+            seenKeys.add(leaderKey);
             participants.push({
-              userId: matchedUser?.id,
-              name: m.fullName || matchedUser?.name || "Team Member",
-              rollNumber: m.rollNumber || null,
-              department: matchedUser?.department || null,
+              userId: team.leader.id,
+              name: team.leader.name,
+              rollNumber: team.leader.rollNumber,
+              department: resolveDepartmentLabel(team.leader.department),
             });
           }
-        } else if (team.leader) {
-          participants.push({
-            userId: team.leader.id,
-            name: team.leader.name,
-            rollNumber: team.leader.rollNumber,
-            department: resolveDepartmentLabel(team.leader.department),
-          });
         }
       } else if (r.registration?.user) {
         participants.push({
@@ -231,6 +257,7 @@ export class LeaderboardRepository {
         id: r.id,
         position: r.position,
         award: r.award,
+        isTeam,
         teamName,
         event: r.event,
         participants,

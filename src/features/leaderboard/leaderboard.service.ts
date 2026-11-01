@@ -3,6 +3,10 @@ import {
   LeaderboardRepository,
   type RawLeaderboardResultItem,
 } from "./repositories/leaderboard.repository";
+import {
+  DEPARTMENTS,
+  resolveDepartmentLabel,
+} from "@/features/profile/academic.config";
 
 export interface EventResultBreakdown {
   resultId: string;
@@ -28,6 +32,23 @@ export interface RankedStudentItem {
   breakdown: EventResultBreakdown[];
 }
 
+export interface TeamMemberSummary {
+  name: string;
+  rollNumber: string | null;
+  department: string | null;
+}
+
+export interface TeamLeaderboardEntry {
+  rank: number;
+  teamName: string;
+  totalPoints: number;
+  firstCount: number;
+  secondCount: number;
+  thirdCount: number;
+  members: TeamMemberSummary[];
+  breakdown: EventResultBreakdown[];
+}
+
 export interface RankedDepartmentItem {
   rank: number;
   name: string;
@@ -40,6 +61,7 @@ export interface RankedDepartmentItem {
 
 export interface LeaderboardData {
   students: RankedStudentItem[];
+  teams: TeamLeaderboardEntry[];
   departments: RankedDepartmentItem[];
   totalPublishedEvents: number;
 }
@@ -65,6 +87,14 @@ export function getPersonStableKey(person: {
 }
 
 /**
+ * Normalizes a team name for grouping across events:
+ * Trims leading/trailing whitespace, collapses internal spaces, and lowercases.
+ */
+export function normalizeTeamName(name: string): string {
+  return name.trim().replace(/\s+/g, " ").toLowerCase();
+}
+
+/**
  * Pure function: compares two ranked entities by:
  * 1. Points descending
  * 2. 1st places descending
@@ -74,12 +104,11 @@ export function getPersonStableKey(person: {
  */
 export function compareLeaderboardEntries<
   T extends {
-    name: string;
     totalPoints: number;
     firstCount: number;
     secondCount: number;
     thirdCount: number;
-  }
+  } & ({ name: string } | { teamName: string })
 >(a: T, b: T): number {
   if (b.totalPoints !== a.totalPoints) {
     return b.totalPoints - a.totalPoints;
@@ -93,7 +122,9 @@ export function compareLeaderboardEntries<
   if (b.thirdCount !== a.thirdCount) {
     return b.thirdCount - a.thirdCount;
   }
-  return a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
+  const nameA = "teamName" in a ? a.teamName : a.name;
+  const nameB = "teamName" in b ? b.teamName : b.name;
+  return nameA.localeCompare(nameB, undefined, { sensitivity: "base" });
 }
 
 /**
@@ -102,7 +133,6 @@ export function compareLeaderboardEntries<
  */
 export function assignCompetitionRanks<
   T extends {
-    name: string;
     totalPoints: number;
     firstCount: number;
     secondCount: number;
@@ -141,7 +171,7 @@ export function assignCompetitionRanks<
  * Aggregates points and podium counts for individual students.
  * - Only published results count.
  * - Solo: participant receives position points.
- * - Team: EVERY member receives full points.
+ * - Team results: excluded (points go to Teams standing, not students).
  * - Multiple finishes for the same person are aggregated by stable key.
  */
 export function aggregateStudentStandings(
@@ -165,6 +195,9 @@ export function aggregateStudentStandings(
   for (const item of results) {
     // Exclude unpublished results
     if (!item.event.resultsPublished) continue;
+
+    // Decision 2: Team results do NOT appear in student standings
+    if (item.isTeam || item.teamName !== null) continue;
 
     const points = pointsConfig[item.position] || 0;
     if (points <= 0) continue; // Only podium positions earn points
@@ -228,12 +261,126 @@ export function aggregateStudentStandings(
   return assignCompetitionRanks(sorted);
 }
 
+/**
+ * Aggregates points and podium counts for teams as ONE unit.
+ * - Only published results count.
+ * - Groups entries by normalized team name across events (displaying first-seen spelling).
+ * - Collects members across finishes.
+ * - Team points are credited as one unit (never duplicated per member).
+ */
+export function aggregateTeamStandings(
+  results: RawLeaderboardResultItem[],
+  pointsConfig: Readonly<Record<number, number>> = LEADERBOARD_POINTS
+): TeamLeaderboardEntry[] {
+  type TeamAccumulator = {
+    normalizedName: string;
+    displayName: string;
+    totalPoints: number;
+    firstCount: number;
+    secondCount: number;
+    thirdCount: number;
+    membersMap: Map<string, TeamMemberSummary>;
+    breakdown: EventResultBreakdown[];
+  };
+
+  const map = new Map<string, TeamAccumulator>();
+
+  for (const item of results) {
+    if (!item.event.resultsPublished) continue;
+    if (!item.isTeam && !item.teamName) continue;
+
+    const points = pointsConfig[item.position] || 0;
+    if (points <= 0) continue;
+
+    const rawTeamName = item.teamName?.trim() || "Team";
+    const normKey = normalizeTeamName(rawTeamName);
+    const collapsedDisplay = rawTeamName.replace(/\s+/g, " ");
+
+    let record = map.get(normKey);
+    if (!record) {
+      record = {
+        normalizedName: normKey,
+        displayName: collapsedDisplay,
+        totalPoints: 0,
+        firstCount: 0,
+        secondCount: 0,
+        thirdCount: 0,
+        membersMap: new Map(),
+        breakdown: [],
+      };
+      map.set(normKey, record);
+    }
+
+    record.totalPoints += points;
+    if (item.position === 1) record.firstCount += 1;
+    else if (item.position === 2) record.secondCount += 1;
+    else if (item.position === 3) record.thirdCount += 1;
+
+    // Collect and deduplicate team members
+    for (const p of item.participants) {
+      const memberKey = p.rollNumber
+        ? p.rollNumber.trim().toUpperCase()
+        : p.userId
+        ? `user:${p.userId}`
+        : `name:${p.name.trim().toLowerCase()}`;
+
+      const existingMember = record.membersMap.get(memberKey);
+      if (!existingMember) {
+        record.membersMap.set(memberKey, {
+          name: p.name,
+          rollNumber: p.rollNumber || null,
+          department: p.department || null,
+        });
+      } else {
+        if (!existingMember.rollNumber && p.rollNumber) {
+          existingMember.rollNumber = p.rollNumber;
+        }
+        if (!existingMember.department && p.department) {
+          existingMember.department = p.department;
+        }
+      }
+    }
+
+    record.breakdown.push({
+      resultId: item.id,
+      eventId: item.event.id,
+      eventTitle: item.event.title,
+      eventSlug: item.event.slug,
+      position: item.position,
+      points,
+      award: item.award,
+      teamName: item.teamName,
+    });
+  }
+
+  for (const record of map.values()) {
+    record.breakdown.sort((a, b) => a.position - b.position || b.points - a.points);
+  }
+
+  const mapped = Array.from(map.values()).map((acc) => ({
+    teamName: acc.displayName,
+    totalPoints: acc.totalPoints,
+    firstCount: acc.firstCount,
+    secondCount: acc.secondCount,
+    thirdCount: acc.thirdCount,
+    members: Array.from(acc.membersMap.values()),
+    breakdown: acc.breakdown,
+  }));
+
+  const sorted = mapped.sort(compareLeaderboardEntries);
+  return assignCompetitionRanks(sorted);
+}
+
 export {
   getPodiumEntries,
   getPodiumAccent,
   type PodiumAccent,
 } from "./leaderboard.podium";
 
+export {
+  getMemberPreview,
+  type MemberPreviewResult,
+} from "./leaderboard.config";
 
 /**
  * Normalizes a department name for grouping:
@@ -244,13 +391,56 @@ export function normalizeDepartmentName(dept: string): string {
 }
 
 /**
+ * Validates and matches a department against valid DEPARTMENTS.
+ * Returns canonical label, normalized key, and first-seen display string, or null if invalid.
+ */
+export function resolveValidDepartment(
+  dept: unknown
+): { canonicalLabel: string; normalizedKey: string; rawDisplay: string } | null {
+  if (typeof dept !== "string") return null;
+  const trimmed = dept.trim();
+  if (!trimmed) return null;
+
+  const direct = resolveDepartmentLabel(trimmed);
+  if (direct) {
+    const isCode = DEPARTMENTS.some(
+      (d) => d.value === trimmed && d.value !== d.label
+    );
+    return {
+      canonicalLabel: direct,
+      normalizedKey: normalizeDepartmentName(direct),
+      rawDisplay: isCode ? direct : trimmed.replace(/\s+/g, " "),
+    };
+  }
+
+  // Check if case-insensitive / normalized form matches any valid department label or code
+  const norm = normalizeDepartmentName(trimmed);
+  const matched = DEPARTMENTS.find(
+    (d) =>
+      normalizeDepartmentName(d.label) === norm ||
+      normalizeDepartmentName(d.value) === norm
+  );
+  if (matched) {
+    const isCode =
+      normalizeDepartmentName(matched.value) === norm &&
+      matched.value !== matched.label;
+    return {
+      canonicalLabel: matched.label,
+      normalizedKey: normalizeDepartmentName(matched.label),
+      rawDisplay: isCode ? matched.label : trimmed.replace(/\s+/g, " "),
+    };
+  }
+  return null;
+}
+
+/**
  * Aggregates points and podium counts for academic departments.
  * - Only published results count.
- * - A winning registration gives its points ONCE to each distinct department
- *   among its participants (not multiplied by team size).
- * - Group departments case-insensitively after trimming and collapsing repeated whitespace,
- *   and display the first-seen spelling.
- * - Participants without a department are ignored.
+ * - Decision 3:
+ *   - Solo result: counts for participant's department (only valid DEPARTMENTS value).
+ *   - Team result: counts for a department ONLY if EVERY member (leader included)
+ *     has the same valid department. If mixed, missing, or invalid, 0 points to departments.
+ * - Points are credited ONCE per winning registration.
  */
 export function aggregateDepartmentStandings(
   results: RawLeaderboardResultItem[],
@@ -274,49 +464,80 @@ export function aggregateDepartmentStandings(
     const points = pointsConfig[item.position] || 0;
     if (points <= 0) continue;
 
-    // Collect distinct departments in this result (keyed by normalizedName, storing first-seen display spelling in this result)
-    const distinctDeptsInResult = new Map<string, string>();
-    for (const p of item.participants) {
-      if (!p.department) continue;
-      const collapsed = p.department.trim().replace(/\s+/g, " ");
-      if (!collapsed) continue;
-      const normKey = normalizeDepartmentName(collapsed);
-      if (!distinctDeptsInResult.has(normKey)) {
-        distinctDeptsInResult.set(normKey, collapsed);
+    let targetDept: {
+      canonicalLabel: string;
+      normalizedKey: string;
+      rawDisplay: string;
+    } | null = null;
+
+    if (item.isTeam || item.teamName !== null) {
+      // Decision 3: Team result counts for department ONLY if EVERY member has the same valid department
+      if (item.participants.length === 0) {
+        continue;
+      }
+
+      const resolvedDepts = item.participants.map((p) =>
+        resolveValidDepartment(p.department)
+      );
+
+      // Any missing or invalid department disqualifies department credit
+      const anyMissingOrInvalid = resolvedDepts.some((d) => d === null);
+      if (anyMissingOrInvalid) {
+        continue;
+      }
+
+      const firstDept = resolvedDepts[0]!;
+      const allShareSameDept = resolvedDepts.every(
+        (d) => d?.normalizedKey === firstDept.normalizedKey
+      );
+      if (!allShareSameDept) {
+        continue;
+      }
+
+      targetDept = firstDept;
+    } else {
+      // Solo result: counts for participant's valid department
+      const participant = item.participants[0];
+      if (!participant || !participant.department) {
+        continue;
+      }
+      targetDept = resolveValidDepartment(participant.department);
+      if (!targetDept) {
+        continue;
       }
     }
 
-    for (const [normKey, firstSeenInResult] of distinctDeptsInResult.entries()) {
-      let record = map.get(normKey);
-      if (!record) {
-        record = {
-          normalizedName: normKey,
-          displayName: firstSeenInResult, // First-seen spelling across all events
-          totalPoints: 0,
-          firstCount: 0,
-          secondCount: 0,
-          thirdCount: 0,
-          breakdown: [],
-        };
-        map.set(normKey, record);
-      }
+    const normKey = targetDept.normalizedKey;
 
-      record.totalPoints += points;
-      if (item.position === 1) record.firstCount += 1;
-      else if (item.position === 2) record.secondCount += 1;
-      else if (item.position === 3) record.thirdCount += 1;
-
-      record.breakdown.push({
-        resultId: item.id,
-        eventId: item.event.id,
-        eventTitle: item.event.title,
-        eventSlug: item.event.slug,
-        position: item.position,
-        points,
-        award: item.award,
-        teamName: item.teamName,
-      });
+    let record = map.get(normKey);
+    if (!record) {
+      record = {
+        normalizedName: normKey,
+        displayName: targetDept.rawDisplay,
+        totalPoints: 0,
+        firstCount: 0,
+        secondCount: 0,
+        thirdCount: 0,
+        breakdown: [],
+      };
+      map.set(normKey, record);
     }
+
+    record.totalPoints += points;
+    if (item.position === 1) record.firstCount += 1;
+    else if (item.position === 2) record.secondCount += 1;
+    else if (item.position === 3) record.thirdCount += 1;
+
+    record.breakdown.push({
+      resultId: item.id,
+      eventId: item.event.id,
+      eventTitle: item.event.title,
+      eventSlug: item.event.slug,
+      position: item.position,
+      points,
+      award: item.award,
+      teamName: item.teamName,
+    });
   }
 
   for (const record of map.values()) {
@@ -337,13 +558,14 @@ export function aggregateDepartmentStandings(
 }
 
 /**
- * Builds full leaderboard data including students, departments, and event totals.
+ * Builds full leaderboard data including students, teams, departments, and event totals.
  */
 export function buildLeaderboardData(
   results: RawLeaderboardResultItem[],
   pointsConfig: Readonly<Record<number, number>> = LEADERBOARD_POINTS
 ): LeaderboardData {
   const students = aggregateStudentStandings(results, pointsConfig);
+  const teams = aggregateTeamStandings(results, pointsConfig);
   const departments = aggregateDepartmentStandings(results, pointsConfig);
 
   const publishedEventIds = new Set(
@@ -352,6 +574,7 @@ export function buildLeaderboardData(
 
   return {
     students,
+    teams,
     departments,
     totalPublishedEvents: publishedEventIds.size,
   };
@@ -359,7 +582,7 @@ export function buildLeaderboardData(
 
 export class LeaderboardService {
   /**
-   * Fetches published results from the repository and computes student & department rankings.
+   * Fetches published results from the repository and computes rankings.
    */
   static async getLeaderboardData(): Promise<LeaderboardData> {
     const rawResults = await LeaderboardRepository.getPublishedResults();

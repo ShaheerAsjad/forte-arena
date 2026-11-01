@@ -8,7 +8,7 @@ export const LEADERBOARD_POINTS: Readonly<Record<number, number>> = Object.freez
   3: 1,
 });
 
-export type LeaderboardView = "students" | "departments";
+export type LeaderboardView = "students" | "teams" | "departments";
 
 export const DEFAULT_LEADERBOARD_VIEW: LeaderboardView = "students";
 
@@ -17,6 +17,9 @@ export const DEFAULT_LEADERBOARD_VIEW: LeaderboardView = "students";
  * Invalid or missing values fall back to 'students'.
  */
 export function parseLeaderboardView(view?: string | null): LeaderboardView {
+  if (view === "teams") {
+    return "teams";
+  }
   if (view === "departments") {
     return "departments";
   }
@@ -61,3 +64,30 @@ export function getScoringLegendText(
     })
     .join(separator);
 }
+
+export interface MemberPreviewResult<T> {
+  visible: T[];
+  hiddenCount: number;
+}
+
+/**
+ * Pure helper for previewing team member chips with a maximum count.
+ * Returns up to `max` items in `visible` and the remaining count in `hiddenCount`.
+ */
+export function getMemberPreview<T>(
+  members: readonly T[] | T[] = [],
+  max = 3
+): MemberPreviewResult<T> {
+  if (!Array.isArray(members) || members.length === 0) {
+    return { visible: [], hiddenCount: 0 };
+  }
+  const safeMax = Math.max(0, max);
+  if (members.length <= safeMax) {
+    return { visible: [...members], hiddenCount: 0 };
+  }
+  return {
+    visible: members.slice(0, safeMax),
+    hiddenCount: members.length - safeMax,
+  };
+}
+

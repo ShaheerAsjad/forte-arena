@@ -15,15 +15,18 @@ import {
   getScoringLegendText,
   parseLeaderboardView,
   getOrdinalSuffix,
+  getMemberPreview,
 } from "@/features/leaderboard/leaderboard.config";
 import {
   aggregateStudentStandings,
+  aggregateTeamStandings,
   aggregateDepartmentStandings,
   buildLeaderboardData,
   getPersonStableKey,
   compareLeaderboardEntries,
   assignCompetitionRanks,
   normalizeDepartmentName,
+  normalizeTeamName,
 } from "@/features/leaderboard/leaderboard.service";
 import {
   getPodiumEntries,
@@ -75,6 +78,7 @@ describe("Leaderboard Config & Legend", () => {
 
   it("parses leaderboard view param with fallback to students", () => {
     expect(parseLeaderboardView("departments")).toBe("departments");
+    expect(parseLeaderboardView("teams")).toBe("teams");
     expect(parseLeaderboardView("students")).toBe("students");
     expect(parseLeaderboardView("invalid")).toBe("students");
     expect(parseLeaderboardView(null)).toBe("students");
@@ -86,7 +90,7 @@ describe("Leaderboard Stable Person Key", () => {
   it("uses trimmed and uppercase roll number when present", () => {
     expect(
       getPersonStableKey({
-        name: "Ahmad Raza",
+        name: "Test Student 1",
         rollNumber: " cs-2023-014 ",
         userId: "user-123",
       })
@@ -96,7 +100,7 @@ describe("Leaderboard Stable Person Key", () => {
   it("falls back to userId if roll number is absent", () => {
     expect(
       getPersonStableKey({
-        name: "Fatima Noor",
+        name: "Test Student 2",
         rollNumber: null,
         userId: "user-456",
       })
@@ -127,6 +131,7 @@ describe("Leaderboard Pure Ranking Logic", () => {
   it("handles empty input safely", () => {
     const data = buildLeaderboardData([]);
     expect(data.students).toEqual([]);
+    expect(data.teams).toEqual([]);
     expect(data.departments).toEqual([]);
     expect(data.totalPublishedEvents).toBe(0);
   });
@@ -201,30 +206,30 @@ describe("Leaderboard Pure Ranking Logic", () => {
     expect(students.find((s) => s.name === "David")).toBeUndefined();
   });
 
-  it("team result gives EVERY member the full points of that position", () => {
+  it("team result gives points to Teams standing and excludes members from students", () => {
     const teamResult: RawLeaderboardResultItem = {
       id: "res-team",
       position: 1,
       award: "Champions",
+      isTeam: true,
       teamName: "CodeNinjas",
       event: baseEvent,
       participants: [
-        { name: "Alice", rollNumber: "CS-001", department: "Computer Science" },
-        { name: "Bob", rollNumber: "CS-002", department: "Computer Science" },
-        { name: "Charlie", rollNumber: "EE-001", department: "Electrical Engineering" },
+        { name: "Alice", rollNumber: "CS-001", department: "ICS" },
+        { name: "Bob", rollNumber: "CS-002", department: "ICS" },
+        { name: "Charlie", rollNumber: "EE-001", department: "ICS" },
       ],
     };
 
     const students = aggregateStudentStandings([teamResult]);
-    expect(students).toHaveLength(3);
+    expect(students).toHaveLength(0); // Team members not in students!
 
-    for (const s of students) {
-      expect(s.totalPoints).toBe(5);
-      expect(s.firstCount).toBe(1);
-      expect(s.breakdown).toHaveLength(1);
-      expect(s.breakdown[0].teamName).toBe("CodeNinjas");
-      expect(s.breakdown[0].points).toBe(5);
-    }
+    const teams = aggregateTeamStandings([teamResult]);
+    expect(teams).toHaveLength(1);
+    expect(teams[0].teamName).toBe("CodeNinjas");
+    expect(teams[0].totalPoints).toBe(5);
+    expect(teams[0].firstCount).toBe(1);
+    expect(teams[0].members).toHaveLength(3);
   });
 
   it("aggregates the same person across several events using their stable key", () => {
@@ -246,64 +251,69 @@ describe("Leaderboard Pure Ranking Logic", () => {
         teamName: null,
         event: baseEvent,
         participants: [
-          { name: "Ahmad Raza", rollNumber: "CS-2023-014", department: "Computer Science" },
+          { name: "Test Student 1", rollNumber: "CS-2023-014", department: "Computer Science" },
         ],
       },
-      // Event 2: Team 3rd place (1 pt) - note different case and whitespace in roll number
+      // Event 2: Solo 3rd place (1 pt) - note different case and whitespace in roll number
       {
-        id: "res-team-2",
+        id: "res-solo-2",
         position: 3,
         award: "Bronze Trophy",
-        teamName: "RoboKnights",
+        isTeam: false,
+        teamName: null,
         event: event2,
         participants: [
-          { name: "Ahmad Raza", rollNumber: " cs-2023-014 ", department: "Computer Science" },
-          { name: "Hamza Ali", rollNumber: "ME-2023-005", department: "Mechanical Engineering" },
+          { name: "Test Student 1", rollNumber: " cs-2023-014 ", department: "ICS" },
         ],
       },
     ];
 
     const students = aggregateStudentStandings(results);
-    const ahmad = students.find((s) => s.name === "Ahmad Raza");
+    const student1 = students.find((s) => s.name === "Test Student 1");
 
-    expect(ahmad).toBeDefined();
-    expect(ahmad?.totalPoints).toBe(6); // 5 + 1
-    expect(ahmad?.firstCount).toBe(1);
-    expect(ahmad?.thirdCount).toBe(1);
-    expect(ahmad?.breakdown).toHaveLength(2);
-    expect(ahmad?.breakdown.map((b) => b.eventSlug)).toContain("hackathon-2026");
-    expect(ahmad?.breakdown.map((b) => b.eventSlug)).toContain("chess-2026");
+    expect(student1).toBeDefined();
+    expect(student1?.totalPoints).toBe(6); // 5 + 1
+    expect(student1?.firstCount).toBe(1);
+    expect(student1?.thirdCount).toBe(1);
+    expect(student1?.breakdown).toHaveLength(2);
+    expect(student1?.breakdown.map((b) => b.eventSlug)).toContain("hackathon-2026");
+    expect(student1?.breakdown.map((b) => b.eventSlug)).toContain("chess-2026");
   });
 
-  it("departments view: gives points ONCE to each distinct department among participants, ignoring participants without department", () => {
-    const teamResult: RawLeaderboardResultItem = {
-      id: "res-team",
+  it("departments view: gives points only when all team members share the same valid department", () => {
+    const teamResultSame: RawLeaderboardResultItem = {
+      id: "res-team-same",
       position: 1,
       award: "First Place",
-      teamName: "MultiDeptSquad",
+      isTeam: true,
+      teamName: "SameDeptSquad",
       event: baseEvent,
       participants: [
-        { name: "Student 1", rollNumber: "CS-1", department: "Computer Science" },
-        { name: "Student 2", rollNumber: "CS-2", department: "Computer Science" },
-        { name: "Student 3", rollNumber: "EE-1", department: "Electrical Engineering" },
-        { name: "Student 4 (External)", rollNumber: "EXT-1", department: null },
+        { name: "Student 1", rollNumber: "CS-1", department: "ICS" },
+        { name: "Student 2", rollNumber: "CS-2", department: "ICS" },
       ],
     };
 
-    const depts = aggregateDepartmentStandings([teamResult]);
-    expect(depts).toHaveLength(2); // CS and EE
+    const teamResultMixed: RawLeaderboardResultItem = {
+      id: "res-team-mixed",
+      position: 1,
+      award: "First Place",
+      isTeam: true,
+      teamName: "MultiDeptSquad",
+      event: baseEvent,
+      participants: [
+        { name: "Student 1", rollNumber: "CS-1", department: "ICS" },
+        { name: "Student 2", rollNumber: "EE-1", department: "FSC_PRE_ENGINEERING" },
+      ],
+    };
 
-    const cs = depts.find((d) => d.name === "Computer Science");
-    const ee = depts.find((d) => d.name === "Electrical Engineering");
+    const deptsSame = aggregateDepartmentStandings([teamResultSame]);
+    expect(deptsSame).toHaveLength(1);
+    expect(deptsSame[0].name).toBe("ICS");
+    expect(deptsSame[0].totalPoints).toBe(5);
 
-    // Computer Science gets 5 points ONCE (not 10 points)
-    expect(cs?.totalPoints).toBe(5);
-    expect(cs?.firstCount).toBe(1);
-    expect(cs?.breakdown).toHaveLength(1);
-
-    // Electrical Engineering gets 5 points ONCE
-    expect(ee?.totalPoints).toBe(5);
-    expect(ee?.firstCount).toBe(1);
+    const deptsMixed = aggregateDepartmentStandings([teamResultMixed]);
+    expect(deptsMixed).toHaveLength(0); // Mixed departments do not credit any department
   });
 
   it("enforces tie-break order: more 1st, then more 2nd, then more 3rd, then name A-Z", () => {
@@ -414,33 +424,35 @@ describe("Leaderboard Pure Ranking Logic", () => {
     const eventB = { ...baseEvent, id: "ev-b", slug: "event-b" };
 
     const results: RawLeaderboardResultItem[] = [
-      // Event 1: Team with "Computer Science" (first-seen spelling) wins 1st (5 pts)
+      // Event 1: Solo with "FSc Pre-Engineering" (first-seen spelling) wins 1st (5 pts)
       {
         id: "res-1",
         position: 1,
         award: "Gold",
-        teamName: "Team 1",
+        isTeam: false,
+        teamName: null,
         event: eventA,
         participants: [
-          { name: "Alice", rollNumber: "R-1", department: "Computer Science" },
+          { name: "Alice", rollNumber: "R-1", department: "FSc Pre-Engineering" },
         ],
       },
-      // Event 2: Team with "  computer   science  " wins 2nd (3 pts)
+      // Event 2: Solo with "  fsc pre-engineering  " wins 2nd (3 pts)
       {
         id: "res-2",
         position: 2,
         award: "Silver",
-        teamName: "Team 2",
+        isTeam: false,
+        teamName: null,
         event: eventB,
         participants: [
-          { name: "Bob", rollNumber: "R-2", department: "  computer   science  " },
+          { name: "Bob", rollNumber: "R-2", department: "  fsc pre-engineering  " },
         ],
       },
     ];
 
     const depts = aggregateDepartmentStandings(results);
     expect(depts).toHaveLength(1);
-    expect(depts[0].name).toBe("Computer Science"); // Preserved first-seen display spelling!
+    expect(depts[0].name).toBe("FSc Pre-Engineering"); // Preserved first-seen display spelling!
     expect(depts[0].totalPoints).toBe(8); // 5 + 3
     expect(depts[0].firstCount).toBe(1);
     expect(depts[0].secondCount).toBe(1);
@@ -742,7 +754,7 @@ describe("Leaderboard Repository Department Sanitization", () => {
           id: "reg-1",
           user: {
             id: "u-1",
-            name: "Ali Khan",
+            name: "Test Student 3",
             rollNumber: "CS-101",
             department: "Computer Science", // Old free-text
           },
@@ -767,7 +779,7 @@ describe("Leaderboard Repository Department Sanitization", () => {
           id: "reg-2",
           user: {
             id: "u-2",
-            name: "Sara Ahmed",
+            name: "Test Student 4",
             rollNumber: "MED-202",
             department: "fsc pre medical", // Old free-text
           },
@@ -792,7 +804,7 @@ describe("Leaderboard Repository Department Sanitization", () => {
           id: "reg-3",
           user: {
             id: "u-3",
-            name: "Bilal Tariq",
+            name: "Test Student 5",
             rollNumber: "ENG-303",
             department: "FSC_PRE_ENGINEERING", // Valid code
           },
@@ -872,15 +884,15 @@ describe("Leaderboard Repository Department Sanitization", () => {
 
     // Old free-text "Computer Science" -> department is null
     expect(results[0].participants[0].department).toBeNull();
-    expect(results[0].participants[0].name).toBe("Ali Khan");
+    expect(results[0].participants[0].name).toBe("Test Student 3");
 
     // Old free-text "fsc pre medical" -> department is null
     expect(results[1].participants[0].department).toBeNull();
-    expect(results[1].participants[0].name).toBe("Sara Ahmed");
+    expect(results[1].participants[0].name).toBe("Test Student 4");
 
     // Valid "FSC_PRE_ENGINEERING" -> department is "FSc Pre-Engineering"
     expect(results[2].participants[0].department).toBe("FSc Pre-Engineering");
-    expect(results[2].participants[0].name).toBe("Bilal Tariq");
+    expect(results[2].participants[0].name).toBe("Test Student 5");
 
     // Find participants by name and assert BOTH team leader (valid "ICS" -> "ICS") and member with old free-text (-> null)
     const teamLeader = results[3].participants.find((p) => p.name === "Team Lead");
@@ -893,4 +905,336 @@ describe("Leaderboard Repository Department Sanitization", () => {
     expect(teamMember?.department).toBeNull();
   });
 });
+
+describe("Task B - Team Points as One Unit & Leaderboard Rework", () => {
+  const baseEvent = {
+    id: "ev-1",
+    slug: "hackathon-2026",
+    title: "Annual Hackathon",
+    category: "TECHNICAL" as const,
+    startsAt: new Date("2026-10-10"),
+    resultsPublished: true,
+  };
+
+  const event2 = {
+    id: "ev-2",
+    slug: "robo-wars-2026",
+    title: "Robo Wars",
+    category: "TECHNICAL" as const,
+    startsAt: new Date("2026-10-15"),
+    resultsPublished: true,
+  };
+
+  it("solo win -> students only (not in teams)", () => {
+    const soloResult: RawLeaderboardResultItem = {
+      id: "res-solo",
+      position: 1,
+      award: "Champion",
+      isTeam: false,
+      teamName: null,
+      event: baseEvent,
+      participants: [{ name: "Test Student 1", rollNumber: "ICS-001", department: "ICS" }],
+    };
+
+    const data = buildLeaderboardData([soloResult]);
+    expect(data.students).toHaveLength(1);
+    expect(data.students[0].name).toBe("Test Student 1");
+    expect(data.students[0].totalPoints).toBe(5);
+
+    expect(data.teams).toHaveLength(0);
+
+    expect(data.departments).toHaveLength(1);
+    expect(data.departments[0].name).toBe("ICS");
+    expect(data.departments[0].totalPoints).toBe(5);
+  });
+
+  it("team win -> teams only and NOT in students", () => {
+    const teamResult: RawLeaderboardResultItem = {
+      id: "res-team",
+      position: 1,
+      award: "Champions",
+      isTeam: true,
+      teamName: "CodeNinjas",
+      event: baseEvent,
+      participants: [
+        { name: "Alice", rollNumber: "ICS-001", department: "ICS" },
+        { name: "Bob", rollNumber: "ICS-002", department: "ICS" },
+        { name: "Charlie", rollNumber: "ICS-003", department: "ICS" },
+      ],
+    };
+
+    const data = buildLeaderboardData([teamResult]);
+
+    // Team members must NOT appear in students
+    expect(data.students).toHaveLength(0);
+
+    // Points go to the TEAM as one unit
+    expect(data.teams).toHaveLength(1);
+    expect(data.teams[0].teamName).toBe("CodeNinjas");
+    expect(data.teams[0].totalPoints).toBe(5);
+    expect(data.teams[0].firstCount).toBe(1);
+    expect(data.teams[0].members).toHaveLength(3);
+    expect(data.teams[0].members.map((m) => m.name)).toEqual(["Alice", "Bob", "Charlie"]);
+
+    // Since all 3 members share "ICS", department gets 5 points
+    expect(data.departments).toHaveLength(1);
+    expect(data.departments[0].name).toBe("ICS");
+    expect(data.departments[0].totalPoints).toBe(5);
+  });
+
+  it("the same squad with different case/spacing in two events merges into one row (first-seen display name)", () => {
+    const results: RawLeaderboardResultItem[] = [
+      {
+        id: "res-1",
+        position: 1,
+        award: "Gold",
+        isTeam: true,
+        teamName: "Code Ninjas", // first seen
+        event: baseEvent,
+        participants: [
+          { name: "Alice", rollNumber: "ICS-001", department: "ICS" },
+          { name: "Bob", rollNumber: "ICS-002", department: "ICS" },
+        ],
+      },
+      {
+        id: "res-2",
+        position: 2,
+        award: "Silver",
+        isTeam: true,
+        teamName: "  code   ninjas  ", // different casing and whitespace
+        event: event2,
+        participants: [
+          { name: "Alice", rollNumber: "ICS-001", department: "ICS" },
+          { name: "Charlie", rollNumber: "ICS-003", department: "ICS" },
+        ],
+      },
+    ];
+
+    const teams = aggregateTeamStandings(results);
+    expect(teams).toHaveLength(1);
+    expect(teams[0].teamName).toBe("Code Ninjas");
+    expect(teams[0].totalPoints).toBe(8); // 5 + 3
+    expect(teams[0].firstCount).toBe(1);
+    expect(teams[0].secondCount).toBe(1);
+    expect(teams[0].breakdown).toHaveLength(2);
+    // Members merged: Alice, Bob, Charlie
+    expect(teams[0].members).toHaveLength(3);
+    expect(teams[0].members.map((m) => m.name)).toContain("Alice");
+    expect(teams[0].members.map((m) => m.name)).toContain("Bob");
+    expect(teams[0].members.map((m) => m.name)).toContain("Charlie");
+    expect(normalizeTeamName("  code   ninjas  ")).toBe("code ninjas");
+  });
+
+  it("department credited only when all members share one valid department", () => {
+    const teamResult: RawLeaderboardResultItem = {
+      id: "res-team",
+      position: 1,
+      award: "Champions",
+      isTeam: true,
+      teamName: "AllMedSquad",
+      event: baseEvent,
+      participants: [
+        { name: "Student 1", rollNumber: "MED-1", department: "FSC_PRE_MEDICAL" },
+        { name: "Student 2", rollNumber: "MED-2", department: "FSc Pre-Medical" },
+      ],
+    };
+
+    const depts = aggregateDepartmentStandings([teamResult]);
+    expect(depts).toHaveLength(1);
+    expect(depts[0].name).toBe("FSc Pre-Medical");
+    expect(depts[0].totalPoints).toBe(5);
+  });
+
+  it("mixed departments -> team only (no department credited)", () => {
+    const teamResult: RawLeaderboardResultItem = {
+      id: "res-team",
+      position: 1,
+      award: "Champions",
+      isTeam: true,
+      teamName: "CrossDeptSquad",
+      event: baseEvent,
+      participants: [
+        { name: "Student 1", rollNumber: "ICS-1", department: "ICS" },
+        { name: "Student 2", rollNumber: "ENG-1", department: "FSC_PRE_ENGINEERING" },
+      ],
+    };
+
+    const data = buildLeaderboardData([teamResult]);
+    expect(data.teams).toHaveLength(1);
+    expect(data.teams[0].totalPoints).toBe(5);
+    expect(data.departments).toHaveLength(0); // Not credited to any department!
+  });
+
+  it("missing or invalid department in a team member -> team only (no department credited)", () => {
+    const teamWithMissingDept: RawLeaderboardResultItem = {
+      id: "res-missing-dept",
+      position: 1,
+      award: "Champions",
+      isTeam: true,
+      teamName: "IncompleteSquad",
+      event: baseEvent,
+      participants: [
+        { name: "Student 1", rollNumber: "ICS-1", department: "ICS" },
+        { name: "Student 2", rollNumber: "EXT-1", department: null },
+      ],
+    };
+
+    const teamWithInvalidDept: RawLeaderboardResultItem = {
+      id: "res-invalid-dept",
+      position: 1,
+      award: "Champions",
+      isTeam: true,
+      teamName: "InvalidDeptSquad",
+      event: baseEvent,
+      participants: [
+        { name: "Student 1", rollNumber: "ICS-1", department: "ICS" },
+        { name: "Student 2", rollNumber: "CS-1", department: "Computer Science" }, // Invalid/old free text
+      ],
+    };
+
+    const data1 = buildLeaderboardData([teamWithMissingDept]);
+    expect(data1.teams).toHaveLength(1);
+    expect(data1.departments).toHaveLength(0);
+
+    const data2 = buildLeaderboardData([teamWithInvalidDept]);
+    expect(data2.teams).toHaveLength(1);
+    expect(data2.departments).toHaveLength(0);
+  });
+
+  it("customParticipantName solo unchanged (solo entry, name only, no department)", () => {
+    const walkInSolo: RawLeaderboardResultItem = {
+      id: "res-walkin",
+      position: 1,
+      award: "Champion",
+      isTeam: false,
+      teamName: null,
+      event: baseEvent,
+      participants: [{ name: "Test Student Walkin", rollNumber: null, department: null }],
+    };
+
+    const data = buildLeaderboardData([walkInSolo]);
+    expect(data.students).toHaveLength(1);
+    expect(data.students[0].name).toBe("Test Student Walkin");
+    expect(data.students[0].totalPoints).toBe(5);
+    expect(data.students[0].department).toBeNull();
+
+    expect(data.teams).toHaveLength(0);
+    expect(data.departments).toHaveLength(0);
+  });
+
+  it("rank ties work properly for teams (competition ranking 1, 1, 3)", () => {
+    const results: RawLeaderboardResultItem[] = [
+      {
+        id: "res-t1",
+        position: 1,
+        award: "Gold",
+        isTeam: true,
+        teamName: "Team Alpha",
+        event: baseEvent,
+        participants: [{ name: "Member A", rollNumber: "1", department: "ICS" }],
+      },
+      {
+        id: "res-t2",
+        position: 1,
+        award: "Gold",
+        isTeam: true,
+        teamName: "Team Beta",
+        event: event2,
+        participants: [{ name: "Member B", rollNumber: "2", department: "ICS" }],
+      },
+      {
+        id: "res-t3",
+        position: 2,
+        award: "Silver",
+        isTeam: true,
+        teamName: "Team Gamma",
+        event: baseEvent,
+        participants: [{ name: "Member C", rollNumber: "3", department: "ICS" }],
+      },
+    ];
+
+    const teams = aggregateTeamStandings(results);
+    expect(teams).toHaveLength(3);
+    expect(teams[0].rank).toBe(1);
+    expect(teams[1].rank).toBe(1); // Tied for rank 1
+    expect(teams[2].rank).toBe(3); // Competition ranking skips to 3
+  });
+
+  it("a team's points are never duplicated across its members", () => {
+    const largeTeamResult: RawLeaderboardResultItem = {
+      id: "res-large-team",
+      position: 1,
+      award: "Champions",
+      isTeam: true,
+      teamName: "MegaSquad",
+      event: baseEvent,
+      participants: [
+        { name: "P1", rollNumber: "1", department: "ICS" },
+        { name: "P2", rollNumber: "2", department: "ICS" },
+        { name: "P3", rollNumber: "3", department: "ICS" },
+        { name: "P4", rollNumber: "4", department: "ICS" },
+        { name: "P5", rollNumber: "5", department: "ICS" },
+      ],
+    };
+
+    const data = buildLeaderboardData([largeTeamResult]);
+    expect(data.teams).toHaveLength(1);
+    expect(data.teams[0].totalPoints).toBe(5); // Not 25!
+    expect(data.departments).toHaveLength(1);
+    expect(data.departments[0].totalPoints).toBe(5); // Not 25!
+    expect(data.students).toHaveLength(0); // 0 in students
+  });
+});
+
+describe("getMemberPreview Helper", () => {
+  it("returns empty visible array and 0 hiddenCount when members list is empty", () => {
+    expect(getMemberPreview([])).toEqual({ visible: [], hiddenCount: 0 });
+    expect(getMemberPreview(undefined as unknown as string[])).toEqual({
+      visible: [],
+      hiddenCount: 0,
+    });
+  });
+
+  it("returns all members when count is less than or equal to max", () => {
+    const members = [{ name: "Alice" }, { name: "Bob" }];
+    expect(getMemberPreview(members, 3)).toEqual({
+      visible: [{ name: "Alice" }, { name: "Bob" }],
+      hiddenCount: 0,
+    });
+
+    const threeMembers = ["A", "B", "C"];
+    expect(getMemberPreview(threeMembers, 3)).toEqual({
+      visible: ["A", "B", "C"],
+      hiddenCount: 0,
+    });
+  });
+
+  it("truncates at max and returns proper hiddenCount when members exceed max", () => {
+    const fiveMembers = ["M1", "M2", "M3", "M4", "M5"];
+    expect(getMemberPreview(fiveMembers, 3)).toEqual({
+      visible: ["M1", "M2", "M3"],
+      hiddenCount: 2,
+    });
+
+    const tenMembers = Array.from({ length: 10 }, (_, i) => `Member ${i + 1}`);
+    const preview = getMemberPreview(tenMembers, 3);
+    expect(preview.visible).toHaveLength(3);
+    expect(preview.visible).toEqual(["Member 1", "Member 2", "Member 3"]);
+    expect(preview.hiddenCount).toBe(7);
+  });
+
+  it("handles custom max values including 0", () => {
+    const members = ["A", "B", "C"];
+    expect(getMemberPreview(members, 1)).toEqual({
+      visible: ["A"],
+      hiddenCount: 2,
+    });
+    expect(getMemberPreview(members, 0)).toEqual({
+      visible: [],
+      hiddenCount: 3,
+    });
+  });
+});
+
+
 
