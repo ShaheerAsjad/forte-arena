@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Badge } from "@/components/ui/Badge";
+import { Stagger, StaggerItem } from "@/components/motion/Stagger";
 import type { RankedResultItem } from "@/features/results/repositories/results.repository";
 import {
   Trophy,
@@ -66,7 +67,7 @@ function WinnerCard({ result }: { result: RankedResultItem }) {
   const styling = getMedalStyling(result.position);
 
   return (
-    <div className="p-3.5 sm:p-4 rounded-2xl bg-white dark:bg-slate-900 border border-navy-100 dark:border-slate-800 shadow-xs flex flex-wrap items-start justify-between gap-3 min-w-0 transition-colors">
+    <div className="p-3.5 sm:p-4 rounded-2xl bg-white dark:bg-slate-900 border border-navy-100 dark:border-slate-800 shadow-xs flex flex-wrap items-start justify-between gap-3 min-w-0 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md hover:border-gold-300/60 dark:hover:border-gold-500/40 active:scale-[0.99] motion-reduce:transition-none motion-reduce:hover:translate-y-0 motion-reduce:active:scale-100">
       <div className="flex items-start gap-3 min-w-0 flex-1 basis-40">
         <div
           className={cn(
@@ -155,7 +156,7 @@ export function EventWinnersSection({
 
         <Link
           href={`/results/${eventSlug}`}
-          className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-bold text-navy-900 dark:text-gold-400 hover:text-navy-700 dark:hover:text-gold-300 transition-colors shrink-0 group self-start sm:self-auto"
+          className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-bold text-navy-900 dark:text-gold-400 hover:text-navy-700 dark:hover:text-gold-300 transition-colors shrink-0 group self-start sm:self-auto focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-400 focus-visible:ring-offset-2 rounded-xl"
         >
           <span>View full results &amp; certificates</span>
           <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
@@ -164,11 +165,13 @@ export function EventWinnersSection({
 
       {/* Main Event Winners Grid */}
       {hasMainResults && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5 sm:gap-4">
+        <Stagger className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5 sm:gap-4">
           {results.map((r) => (
-            <WinnerCard key={r.id} result={r} />
+            <StaggerItem key={r.id}>
+              <WinnerCard result={r} />
+            </StaggerItem>
           ))}
-        </div>
+        </Stagger>
       )}
 
       {/* Child Competitions (Related Events under Sub-headings) */}
@@ -192,7 +195,7 @@ export function EventWinnersSection({
               <div className="flex items-center gap-3 text-xs font-semibold shrink-0">
                 <Link
                   href={`/events/${child.slug}`}
-                  className="text-navy-800 dark:text-slate-300 hover:text-navy-950 dark:hover:text-gold-400 inline-flex items-center gap-1"
+                  className="text-navy-800 dark:text-slate-300 hover:text-navy-950 dark:hover:text-gold-400 inline-flex items-center gap-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-400 rounded-md"
                 >
                   <span>View Event</span>
                   <ExternalLink className="w-3 h-3" />
@@ -200,7 +203,7 @@ export function EventWinnersSection({
                 <span className="text-navy-200 dark:text-slate-700">•</span>
                 <Link
                   href={`/results/${child.slug}`}
-                  className="text-gold-700 dark:text-gold-400 hover:text-gold-800 inline-flex items-center gap-1 font-bold"
+                  className="text-gold-700 dark:text-gold-400 hover:text-gold-800 inline-flex items-center gap-1 font-bold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-400 rounded-md"
                 >
                   <span>Full Results</span>
                   <ArrowRight className="w-3.5 h-3.5" />
@@ -208,11 +211,13 @@ export function EventWinnersSection({
               </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5 sm:gap-4">
+            <Stagger className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5 sm:gap-4">
               {child.results.map((r) => (
-                <WinnerCard key={r.id} result={r} />
+                <StaggerItem key={r.id}>
+                  <WinnerCard result={r} />
+                </StaggerItem>
               ))}
-            </div>
+            </Stagger>
           </div>
         ))}
     </section>

@@ -55,17 +55,17 @@ function EventsListSkeleton() {
   return (
     <div className="space-y-6">
       {/* Search & Filter Bar Skeleton */}
-      <div className="bg-white/95 rounded-3xl border border-navy-100 p-6 space-y-4 shadow-sm animate-pulse">
-        <div className="h-12 bg-navy-50 rounded-2xl w-full" />
+      <div className="bg-white/95 dark:bg-slate-900/95 rounded-3xl border border-navy-100 dark:border-slate-800 p-6 space-y-4 shadow-sm">
+        <Skeleton className="h-12 w-full rounded-2xl" />
         <div className="flex items-center gap-2 overflow-hidden">
           {Array.from({ length: 6 }).map((_, i) => (
-            <div key={i} className="h-10 w-28 bg-navy-50 rounded-xl shrink-0" />
+            <Skeleton key={i} className="h-10 w-28 rounded-xl shrink-0" />
           ))}
         </div>
-        <div className="hidden md:grid md:grid-cols-3 gap-3 pt-2 border-t border-navy-50">
-          <div className="h-10 bg-navy-50 rounded-xl" />
-          <div className="h-10 bg-navy-50 rounded-xl" />
-          <div className="h-10 bg-navy-50 rounded-xl" />
+        <div className="hidden md:grid md:grid-cols-3 gap-3 pt-2 border-t border-navy-50 dark:border-slate-800">
+          <Skeleton className="h-10 rounded-xl" />
+          <Skeleton className="h-10 rounded-xl" />
+          <Skeleton className="h-10 rounded-xl" />
         </div>
       </div>
 
@@ -79,13 +79,13 @@ function EventsListSkeleton() {
         {Array.from({ length: 6 }).map((_, i) => (
           <Card
             key={i}
-            className="h-full flex flex-col overflow-hidden border border-navy-100 bg-white"
+            className="h-full flex flex-col overflow-hidden border border-navy-100 dark:border-slate-800 bg-white dark:bg-slate-900 p-0"
           >
             {/* Poster area skeleton */}
-            <div className="relative w-full aspect-16/10 bg-navy-100/70 animate-pulse">
-              <div className="absolute top-3 left-3 w-12 h-14 rounded-xl bg-white/70 shadow-sm" />
-              <div className="absolute top-3 right-3 w-20 h-6 rounded-full bg-white/70" />
-              <div className="absolute bottom-3 left-3 w-24 h-6 rounded-lg bg-navy-950/25" />
+            <div className="relative w-full aspect-16/10 bg-navy-100/70 dark:bg-slate-800/80">
+              <div className="absolute top-3 left-3 w-12 h-14 rounded-xl bg-white/70 dark:bg-slate-700/70 shadow-sm" />
+              <div className="absolute top-3 right-3 w-20 h-6 rounded-full bg-white/70 dark:bg-slate-700/70" />
+              <div className="absolute bottom-3 left-3 w-24 h-6 rounded-lg bg-navy-950/25 dark:bg-slate-900/60" />
             </div>
 
             {/* Content body skeleton */}
@@ -96,7 +96,7 @@ function EventsListSkeleton() {
                 <Skeleton className="h-3.5 w-2/3 rounded-md" />
               </div>
 
-              <div className="space-y-2.5 pt-3 border-t border-navy-50">
+              <div className="space-y-2.5 pt-3 border-t border-navy-50 dark:border-slate-800">
                 <div className="flex items-center justify-between">
                   <Skeleton className="h-3.5 w-28 rounded-md" />
                   <Skeleton className="h-3.5 w-16 rounded-md" />

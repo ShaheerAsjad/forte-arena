@@ -6,6 +6,7 @@ import Image from "next/image";
 import { ResultsRepository } from "@/features/results/repositories/results.repository";
 import { formatEventDate } from "@/lib/dates";
 import { Button } from "@/components/ui/Button";
+import { Skeleton } from "@/components/ui/Skeleton";
 import {
   Trophy,
   ArrowLeft,
@@ -195,10 +196,41 @@ async function CertificatePageContent({
 
 function CertificateSkeleton() {
   return (
-    <div className="space-y-8 animate-pulse">
-      <div className="h-6 w-32 bg-navy-100 rounded-md" />
-      <div className="h-56 bg-navy-900 rounded-3xl" />
-      <div className="h-96 bg-navy-100 rounded-3xl" />
+    <div className="space-y-8">
+      {/* Back Link Row */}
+      <div className="flex items-center justify-between">
+        <Skeleton className="h-4 w-36 rounded-md" />
+        <Skeleton className="h-4 w-40 rounded-md" />
+      </div>
+
+      {/* Header and Details */}
+      <div className="p-6 sm:p-10 rounded-3xl bg-gradient-to-br from-navy-950 via-navy-900 to-navy-950 text-ivory border border-navy-800 shadow-xl space-y-4 text-center relative overflow-hidden">
+        <div className="flex justify-center">
+          <Skeleton className="h-6 w-52 rounded-full bg-navy-800/80" />
+        </div>
+        <div className="space-y-2 max-w-md mx-auto flex flex-col items-center">
+          <Skeleton className="h-8 sm:h-10 w-64 rounded-xl bg-navy-800/80" />
+          <Skeleton className="h-4 w-80 rounded-md bg-navy-800/60" />
+        </div>
+        <div className="flex flex-wrap items-center justify-center gap-4 pt-3 border-t border-white/10">
+          <Skeleton className="h-4 w-28 rounded-md bg-navy-800/60" />
+          <Skeleton className="h-4 w-28 rounded-md bg-navy-800/60" />
+          <Skeleton className="h-5 w-20 rounded-full bg-navy-800/80" />
+        </div>
+      </div>
+
+      {/* Framed Certificate Box Skeleton */}
+      <div className="max-w-4xl mx-auto">
+        <div className="p-3 sm:p-5 rounded-3xl bg-gradient-to-b from-navy-100/70 to-navy-50/50 dark:from-slate-800/70 dark:to-slate-900/50 border-2 border-gold-400/40 shadow-lg">
+          <div className="rounded-2xl border-2 border-dashed border-gold-300/60 bg-white dark:bg-slate-900 p-4 sm:p-8 flex flex-col items-center justify-center min-h-[380px] space-y-6">
+            <Skeleton className="w-full aspect-[1.414/1] max-w-2xl rounded-xl shadow-md" />
+            <div className="flex items-center gap-3 pt-2">
+              <Skeleton className="h-11 w-44 rounded-xl" />
+              <Skeleton className="h-11 w-36 rounded-xl" />
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

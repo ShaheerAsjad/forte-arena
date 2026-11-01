@@ -142,7 +142,7 @@ export function SiteHeader() {
                 key={link.href}
                 href={link.href}
                 className={cn(
-                  "relative group px-2.5 lg:px-4 py-1.5 rounded-full text-xs lg:text-sm font-medium transition-colors select-none",
+                  "relative group px-2.5 lg:px-4 py-1.5 rounded-full text-xs lg:text-sm font-medium transition-colors select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-400 focus-visible:ring-offset-2 motion-reduce:transition-none",
                   isActive
                     ? isDarkHero
                       ? "text-navy-950 font-bold"

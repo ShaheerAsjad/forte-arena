@@ -10,6 +10,7 @@ import { toast } from "sonner";
 import { signUp } from "@/lib/auth-client";
 import { APP_NAME } from "@/config/app";
 import { PasswordInput } from "@/components/ui/PasswordInput";
+import { Skeleton } from "@/components/ui/Skeleton";
 import {
   DEPARTMENTS,
   YEARS,
@@ -263,10 +264,51 @@ function SignupForm() {
   );
 }
 
+function SignupFormSkeleton() {
+  return (
+    <div className="w-full max-w-md p-8 space-y-6 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-lg">
+      <div className="text-center space-y-2 flex flex-col items-center">
+        <Skeleton className="h-7 w-32 rounded-md" />
+        <Skeleton className="h-4 w-52 rounded-md" />
+      </div>
+      <div className="space-y-4">
+        <div className="space-y-1.5">
+          <Skeleton className="h-4 w-20 rounded-md" />
+          <Skeleton className="h-10 w-full rounded-lg" />
+        </div>
+        <div className="space-y-1.5">
+          <Skeleton className="h-4 w-24 rounded-md" />
+          <Skeleton className="h-10 w-full rounded-lg" />
+        </div>
+        <div className="space-y-1.5">
+          <Skeleton className="h-4 w-24 rounded-md" />
+          <Skeleton className="h-10 w-full rounded-lg" />
+        </div>
+        <div className="space-y-1.5">
+          <Skeleton className="h-4 w-28 rounded-md" />
+          <Skeleton className="h-10 w-full rounded-lg" />
+        </div>
+        <div className="space-y-1.5">
+          <Skeleton className="h-4 w-20 rounded-md" />
+          <Skeleton className="h-10 w-full rounded-lg" />
+        </div>
+        <div className="space-y-1.5">
+          <Skeleton className="h-4 w-32 rounded-md" />
+          <Skeleton className="h-10 w-full rounded-lg" />
+        </div>
+        <Skeleton className="h-10 w-full rounded-lg" />
+      </div>
+      <div className="flex justify-center pt-2">
+        <Skeleton className="h-4 w-44 rounded-md" />
+      </div>
+    </div>
+  );
+}
+
 export default function SignupPage() {
   return (
     <div className="min-h-screen flex items-center justify-center p-4 bg-zinc-50 dark:bg-zinc-950">
-      <Suspense fallback={<div className="p-8 text-center text-zinc-500">Loading...</div>}>
+      <Suspense fallback={<SignupFormSkeleton />}>
         <SignupForm />
       </Suspense>
     </div>

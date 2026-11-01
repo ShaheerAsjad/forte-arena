@@ -77,10 +77,13 @@ export function EventCard({ event, className }: EventCardProps) {
   const dateParts = getDateParts(item.startsAt);
 
   return (
-    <Link href={`/events/${item.slug}`} className="group block focus:outline-none h-full">
+    <Link
+      href={`/events/${item.slug}`}
+      className="group block focus:outline-none focus-visible:ring-2 focus-visible:ring-gold-400 focus-visible:ring-offset-2 rounded-2xl h-full"
+    >
       <Card
         hoverable
-        className={`h-full flex flex-col overflow-hidden border border-navy-100/80 bg-white transition-all duration-300 hover:-translate-y-1.5 group-hover:border-gold-400/80 group-hover:shadow-[0_16px_36px_-8px_rgba(245,185,1,0.22),0_8px_16px_-6px_rgba(0,15,64,0.06)] ${className ?? ""}`}
+        className={`h-full flex flex-col overflow-hidden border border-navy-100/80 dark:border-slate-800 bg-white dark:bg-slate-900 transition-all duration-200 hover:-translate-y-1.5 active:scale-[0.99] motion-reduce:transition-none motion-reduce:hover:translate-y-0 motion-reduce:active:scale-100 group-hover:border-gold-400/80 group-hover:shadow-[0_16px_36px_-8px_rgba(245,185,1,0.22),0_8px_16px_-6px_rgba(0,15,64,0.06)] ${className ?? ""}`}
       >
         {/* Poster Media / Illustrated Geometric Fallback */}
         <div className="relative w-full aspect-16/10 bg-gradient-to-br from-navy-950 via-navy-900 to-navy-800 overflow-hidden">

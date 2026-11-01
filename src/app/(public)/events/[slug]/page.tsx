@@ -394,16 +394,62 @@ async function EventDetailContent({ params }: EventDetailPageProps) {
 function EventDetailSkeleton() {
   return (
     <div className="space-y-12 max-w-6xl mx-auto px-4 sm:px-6">
-      <div className="pt-4">
+      {/* Top breadcrumb */}
+      <div className="pt-4 flex items-center justify-between">
         <Skeleton className="h-5 w-40 rounded-md" />
       </div>
-      <Card className="h-64 sm:h-96 bg-navy-900 rounded-3xl animate-pulse border-navy-800" />
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-        <div className="lg:col-span-8">
-          <Card className="h-80 bg-white rounded-2xl border border-navy-100 animate-pulse" />
+
+      {/* Hero Banner Skeleton */}
+      <div className="h-64 sm:h-96 bg-gradient-to-br from-navy-950 via-navy-900 to-navy-950 rounded-3xl border border-navy-800 p-8 sm:p-12 flex flex-col justify-between shadow-xl">
+        <div className="flex items-center gap-2">
+          <Skeleton className="h-6 w-24 rounded-full bg-navy-800/80" />
+          <Skeleton className="h-6 w-24 rounded-full bg-navy-800/80" />
         </div>
-        <div className="lg:col-span-4">
-          <Card className="p-7 space-y-4 bg-white rounded-2xl border border-navy-100 animate-pulse h-72" />
+        <div className="space-y-3 max-w-2xl">
+          <Skeleton className="h-8 sm:h-12 w-4/5 rounded-xl bg-navy-800/80" />
+          <Skeleton className="h-4 sm:h-5 w-full rounded-md bg-navy-800/60" />
+        </div>
+        <div className="flex items-center gap-4">
+          <Skeleton className="h-4 w-32 rounded-md bg-navy-800/60" />
+          <Skeleton className="h-4 w-28 rounded-md bg-navy-800/60" />
+        </div>
+      </div>
+
+      {/* Main 2-column layout */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+        {/* Left Column (8 cols): Tabs & Body */}
+        <div className="lg:col-span-8 space-y-6">
+          <Card className="p-6 bg-white dark:bg-slate-900 rounded-3xl border border-navy-100 dark:border-slate-800 space-y-6">
+            {/* Tabs Header Skeleton */}
+            <div className="flex items-center gap-2 border-b border-navy-100 dark:border-slate-800 pb-3">
+              <Skeleton className="h-8 w-24 rounded-lg" />
+              <Skeleton className="h-8 w-20 rounded-lg" />
+              <Skeleton className="h-8 w-24 rounded-lg" />
+              <Skeleton className="h-8 w-20 rounded-lg" />
+            </div>
+            {/* Content lines */}
+            <div className="space-y-3 pt-2">
+              <Skeleton className="h-4 w-full rounded-md" />
+              <Skeleton className="h-4 w-full rounded-md" />
+              <Skeleton className="h-4 w-5/6 rounded-md" />
+              <Skeleton className="h-4 w-4/6 rounded-md" />
+            </div>
+          </Card>
+        </div>
+
+        {/* Right Column (4 cols): Register Card & Notices */}
+        <div className="lg:col-span-4 space-y-6">
+          <Card className="p-7 space-y-5 bg-white dark:bg-slate-900 rounded-3xl border border-navy-100 dark:border-slate-800 shadow-sm">
+            <div className="space-y-2">
+              <Skeleton className="h-6 w-36 rounded-md" />
+              <Skeleton className="h-4 w-full rounded-md" />
+            </div>
+            <div className="space-y-3 pt-2 border-t border-navy-50 dark:border-slate-800">
+              <Skeleton className="h-4 w-32 rounded-md" />
+              <Skeleton className="h-4 w-28 rounded-md" />
+            </div>
+            <Skeleton className="h-11 w-full rounded-xl" />
+          </Card>
         </div>
       </div>
     </div>
