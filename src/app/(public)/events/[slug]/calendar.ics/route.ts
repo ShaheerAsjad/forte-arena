@@ -4,7 +4,6 @@ import { EventsService } from "@/features/events/services/events.service";
 import { buildIcs, isCalendarEligible } from "@/features/events/events.calendar";
 import { env } from "@/config/env";
 
-export const dynamic = "force-dynamic";
 
 export async function GET(
   _request: Request,
